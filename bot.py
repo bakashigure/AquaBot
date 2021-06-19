@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from os import path
 
 import nonebot
 from nonebot.adapters.cqhttp import Bot as CQHTTPBot
@@ -16,15 +15,15 @@ from nonebot.adapters.cqhttp import Bot as CQHTTPBot
 #            format=default_format)
 
 # You can pass some keyword args config to init function
-nonebot.init()
+nonebot.init(_env_file=".env")
 app = nonebot.get_asgi()
 
 driver = nonebot.get_driver()
 driver.register_adapter("cqhttp", CQHTTPBot)
 
-#nonebot.load_builtin_plugins()
+nonebot.load_builtin_plugins()
 #nonebot.load_plugin("src.plugins.aquabot.uu")
-nonebot.load_plugin("src/plugins/aquabot")
+nonebot.load_plugin("src.plugins.aquabot")
 
 #nonebot.load_from_toml(".pyproject.toml")
 
