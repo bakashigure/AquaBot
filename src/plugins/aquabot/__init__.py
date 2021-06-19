@@ -14,27 +14,39 @@ global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
 
+
+logger.info(global_config)
+
+logger.warning(type(global_config.aqua_bot_pic_storage))
+logger.warning(global_config.aqua_bot_pic_storage)
+
+
 _config = dict()  # 读取配置
 _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
+_help_url="https://example.com"
 
 
 def prehandle():
-    _config['storage'] = global_config.AQUA_BOT_PIC_STORAGE
+    global _help_url
+    _config['storage'] = global_config.aqua_bot_pic_storage
     if _config['storage'] == "local":
-        _config['dir'] = global_config.AQUA_BOT_PICTURE_DIR
+        _config['dir'] = global_config.aqua_bot_pic_storage
         # todo 试着写一下文件检查权限(linux)
         # 如果路径不存在就手动创建
         pass
     elif _config['storage'] == "oss":
-        _config['id'] = global_config.AQUA_BOT_OSS_ACCESS_KEY_ID
-        _config['secret'] = global_config.AQUA_BOT_OSS_ACCESS_KEY_ID_SECRET
-        _config['prefix'] = global_config.AQUA_BOT_OSS_PREFIX
-        _config['endpoint'] = global_config.AQUA_BOT_OSS_ENDPOINT
-        _config['bucket'] = global_config.AQUA_BOT_OSS_BUCKET
+        _config['access_key_id'] = global_config.aqua_bot_oss_access_key_id
+        _config['access_key_secret'] = global_config.aqua_bot_oss_access_key_secret
+        _config['prefix'] = global_config.aqua_bot_oss_prefix
+        _config['endpoint'] = global_config.aqua_bot_oss_endpoint
+        _config['bucket'] = global_config.aqua_bot_oss_bucket
         for k, v in _config.items():
             if v == "":
-                logger.warning("%s未设置, 请检查.env文件" % k)
+                logger.error("您选择了%s的图片存储方式"%_config['storage'],)
+                logger.error("但 aqua_bot_oss_%s 未设置, 请检查.env文件, 配置详见 %s" %(k,_help_url))
+                exit()
                 # todo bot咋中断来着, 能直接raise出去吗..
+
 
         try:
             oss2.auth(_config['id'], _config['secret'])
@@ -59,6 +71,7 @@ def prehandle():
         # todo
 
 
+prehandle()
 aqua = on_command("qua", priority=5)
 args = list()
 
@@ -155,6 +168,6 @@ async def test_aqua(bot: Bot, event: Event):
 async def more_aqua(): ...
 
 
-@on_command("来点夸图", aliases=("来张夸图", "夸图来"))
+
 async def one_aqua(bot: Bot, event: Event):
     return await random_aqua(bot, event)
