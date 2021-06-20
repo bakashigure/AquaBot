@@ -5,73 +5,28 @@ from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 import pixivpy3 as pixiv
-from .config import Config
+from .config import Config,prehandle
 import httpx
 import operator
 import oss2
 
+
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
-
-
-logger.info(global_config)
-
-logger.warning(type(global_config.aqua_bot_pic_storage))
-logger.warning(global_config.aqua_bot_pic_storage)
-
-
-_config = dict()  # 读取配置
-_message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
-_help_url="https://example.com"
-
-
-def prehandle():
-    global _help_url
-    _config['storage'] = global_config.aqua_bot_pic_storage
-    if _config['storage'] == "local":
-        _config['dir'] = global_config.aqua_bot_pic_storage
-        # todo 试着写一下文件检查权限(linux)
-        # 如果路径不存在就手动创建
-        pass
-    elif _config['storage'] == "oss":
-        _config['access_key_id'] = global_config.aqua_bot_oss_access_key_id
-        _config['access_key_secret'] = global_config.aqua_bot_oss_access_key_secret
-        _config['prefix'] = global_config.aqua_bot_oss_prefix
-        _config['endpoint'] = global_config.aqua_bot_oss_endpoint
-        _config['bucket'] = global_config.aqua_bot_oss_bucket
-        for k, v in _config.items():
-            if v == "":
-                logger.error("您选择了%s的图片存储方式"%_config['storage'],)
-                logger.error("但 aqua_bot_oss_%s 未设置, 请检查.env文件, 配置详见 %s" %(k,_help_url))
-                exit()
-                # todo bot咋中断来着, 能直接raise出去吗..
-
-
-        try:
-            oss2.auth(_config['id'], _config['secret'])
-        except:
-            # todo oss登陆失败
-            pass
-
-    else:
-        # todo 非正确存储方式处理
-        _help_url = ""
-        logger.error("存储方式不正确, 请检查.env文件, 有关配置详见%s " % _help_url)
-        pass
-
-    _config['refresh_token'] = global_config.AQUA_BOT_PIXIV_REFRESH_TOKEN
-    if _config['refresh_token'] == "":
-        logger.warning("没有设置pixiv refresh token, pixiv相关功能将不可用")
-        # todo
-
-    _config['saucenao_api'] = global_config.AQUA_BOT_SAUCENAO_API
-    if _config['saucenao_api'] == "":
-        logger.warning("没有设置saucenao api, 搜图相关功能将不可用")
-        # todo
-
-
 prehandle()
+
+#logger.info(global_config)
+
+#logger.warning(type(global_config.aqua_bot_pic_storage))
+#logger.warning(global_config.aqua_bot_pic_storage)
+
+
+
+_message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
+
+
+
 aqua = on_command("qua", priority=5)
 args = list()
 
