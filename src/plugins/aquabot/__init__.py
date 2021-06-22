@@ -14,7 +14,7 @@ import oss2
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
-prehandle()
+_config=prehandle()
 
 #logger.info(global_config)
 
