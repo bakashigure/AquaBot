@@ -25,6 +25,8 @@ _help_url = "https://example.com"
 
 def prehandle():
     global _help_url
+
+    _config['cqhttp']= global_config.cqhttp
     _config['storage'] = global_config.aqua_bot_pic_storage
 
     # 检测存储方式为本地或者oss

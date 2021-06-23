@@ -13,6 +13,8 @@ from .utils import *
 from nonebot.adapters.cqhttp.utils import escape,unescape
 
 
+
+
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
@@ -76,8 +78,12 @@ async def random_aqua(bot: Bot, event: Event):
 
 async def upload_aqua(bot: Bot, event: Event):
     if _config['storage']=="local":
-        logger.warning(args)
-        logger.warning(event.json())
+        #logger.warning(args)
+        #logger.warning(event.json())
+
+        c=await get_message_image(data=event.json(),type='file',path=_config['cqhttp'])
+        logger.warning(c)
+
         pass
     else:
         pass
