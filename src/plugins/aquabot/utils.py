@@ -19,7 +19,7 @@ def _get_bot(bot_id):
           bot_id(int): bot的qq号
 
     Returns:
-          bot实例一份
+          bot(nonebot.adapters.cqhttp.bot.Bot): bot实例
     """
     try:
         logger.warning(nonebot.get_bots())
@@ -50,6 +50,7 @@ async def get_message_image(data: str, type: Literal['file', 'url'], path: str =
             if type == "file":
                 _file_detail = await bot.get_image(file=msg['data'][type])
                 _path = path+'/'+str(_file_detail['file'])
+                # TODO add linux file system
                 _img_list.append(_path)
             else:
                 _img_list.append(msg['data'][type])
