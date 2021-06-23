@@ -9,6 +9,8 @@ from .config import Config,prehandle
 import httpx
 import operator
 import oss2
+from .utils import *
+from nonebot.adapters.cqhttp.utils import escape,unescape
 
 
 global_config = nonebot.get_driver().config
@@ -33,6 +35,7 @@ args = list()
 
 @aqua.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
+    global args
     args = str(event.get_message()).split()
     logger.warning(args)
 
@@ -71,7 +74,13 @@ async def random_aqua(bot: Bot, event: Event):
     ...
 
 
-async def upload_aqua(bot: Bot, event: Event): ...
+async def upload_aqua(bot: Bot, event: Event):
+    if _config['storage']=="local":
+        logger.warning(args)
+        logger.warning(event.json())
+        pass
+    else:
+        pass
 async def delete_aqua(bot: Bot, event: Event): ...
 async def help_aqua(bot: Bot, event: Event): ...
 async def search_aqua(bot: Bot, event: Event): ...
