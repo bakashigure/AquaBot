@@ -3,13 +3,17 @@ Define some useful functions for AquaBot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
+
+
 import json
 from typing import Literal
 import nonebot
 from nonebot import logger
-
+from PIL import Image
+logger.warning("IMPORT UTILS")
 __version__ = '0.0.1'
 
+global_config = nonebot.get_driver().config
 
 def _get_bot(bot_id):
     """
@@ -29,7 +33,7 @@ def _get_bot(bot_id):
         logger.error("bot'%s'未连接" % bot_id)
 
 
-async def get_message_image(data: str, type: Literal['file', 'url'], path: str = '') -> list:
+async def get_message_image(data: str, type: Literal['file', 'url']) -> list:
     """
     返回一个包含消息中所有图片文件的list, 
 
@@ -43,6 +47,7 @@ async def get_message_image(data: str, type: Literal['file', 'url'], path: str =
           list: 包含图片绝对路径或url的list
     """
     _img_list = []
+    path=global_config.cqhttp
     _data = json.loads(data)
     bot = _get_bot(_data['self_id'])
     for msg in _data['message']:
@@ -66,3 +71,22 @@ def get_message_text(data: str) -> str:
     返回消息纯文本
     """
     pass
+
+async def _resize_image(file,max_size):
+    im=Image.open(file)
+    # TODO 修改图片尺寸, 太困了 明天在写
+    ...
+
+async def _upload_custom(origin: str, target: str, target_filename: str, max_size: int = 4096):
+    """Upload函数
+
+    Args:
+        origin(str): 源文件地址
+        targer(str): 目标路径
+        target_filename(str): 目标文件名
+        max_size(int): 最大文件大小, 大于的直接进行一个压缩 
+    """
+    if _config['storage']=="local":
+
+        ...
+
