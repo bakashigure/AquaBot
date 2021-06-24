@@ -5,30 +5,28 @@ from nonebot.typing import T_State
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 import pixivpy3 as pixiv
-from .config import Config,prehandle
+from .config import Config, prehandle
 import httpx
 import operator
 import oss2
 from .utils import *
-from nonebot.adapters.cqhttp.utils import escape,unescape
+from nonebot.adapters.cqhttp.utils import escape, unescape
 
-
+logger.warning("IMPORT INIT")
 
 
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
-_config=prehandle()
+_config = prehandle()
 
-#logger.info(global_config)
+# logger.info(global_config)
 
-#logger.warning(type(global_config.aqua_bot_pic_storage))
-#logger.warning(global_config.aqua_bot_pic_storage)
-
+# logger.warning(type(global_config.aqua_bot_pic_storage))
+# logger.warning(global_config.aqua_bot_pic_storage)
 
 
 _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
-
 
 
 aqua = on_command("qua", priority=5)
@@ -76,17 +74,22 @@ async def random_aqua(bot: Bot, event: Event):
     ...
 
 
-async def upload_aqua(bot: Bot, event: Event):
-    if _config['storage']=="local":
-        #logger.warning(args)
-        #logger.warning(event.json())
 
-        c=await get_message_image(data=event.json(),type='file',path=_config['cqhttp'])
+async def upload_aqua(bot: Bot, event: Event):
+    """上传一张图片
+    """
+    if _config['storage'] == "local":
+        # logger.warning(args)
+        # logger.warning(event.json())
+
+        c = await get_message_image(data=event.json(), type='file', path=_config['cqhttp'])
         logger.warning(c)
 
         pass
     else:
         pass
+
+
 async def delete_aqua(bot: Bot, event: Event): ...
 async def help_aqua(bot: Bot, event: Event): ...
 async def search_aqua(bot: Bot, event: Event): ...
@@ -111,24 +114,21 @@ async def pixiv_aqua(bot: Bot, event: Event):
     }
 
     res_json = api.search_illust(
-        word="湊あくあ", search_target="exact_match_for_tags", sort="date_asc",duration=_duration[args[1]])
+        word="湊あくあ", search_target="exact_match_for_tags", sort="date_asc", duration=_duration[args[1]])
 
-    illust_list=[]
+    illust_list = []
     for illust in res_json.illusts:
-        __dict={'title':illust.title,'id':illust.id,'bookmark':int(illust.total_bookmarks),'large_url':illust.image_urls['large']}
+        __dict = {'title': illust.title, 'id': illust.id, 'bookmark': int(
+            illust.total_bookmarks), 'large_url': illust.image_urls['large']}
         illust_list.append(__dict)
 
-
-    illust_list = sorted(illust_list,key=operator.itemgetter('bookmark'))[::-1]
+    illust_list = sorted(
+        illust_list, key=operator.itemgetter('bookmark'))[::-1]
 
     _id = args[3]
     async with httpx.AsyncClient() as client:
-        headers={'Referer':'https://www.pixiv.net/'}
+        headers = {'Referer': 'https://www.pixiv.net/'}
         r = client.get(illust_list[_id])
-
-
-
-
 
 
 async def test_aqua(bot: Bot, event: Event):
@@ -136,7 +136,6 @@ async def test_aqua(bot: Bot, event: Event):
 
 
 async def more_aqua(): ...
-
 
 
 async def one_aqua(bot: Bot, event: Event):
