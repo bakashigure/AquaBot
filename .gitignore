@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+.pep8
 data.txt
 # C extensions
 *.so
