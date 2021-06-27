@@ -11,14 +11,14 @@ import operator
 import oss2
 from .utils import *
 from nonebot.adapters.cqhttp.utils import escape, unescape
-
+from .config import _config
 logger.warning("IMPORT INIT")
 
 
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
-_config = prehandle()
+
 
 # logger.info(global_config)
 
