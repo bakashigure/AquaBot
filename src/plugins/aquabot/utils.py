@@ -9,6 +9,7 @@ from typing import Literal
 import nonebot
 from nonebot import logger
 from PIL import Image
+import oss2
 from .config import _config
 from time import time
 from os.path import getsize as _getsize
@@ -72,6 +73,7 @@ def get_message_text(data: str) -> str:
     """
     pass
 
+
 def _clear_cache(): ...
 
 
@@ -122,6 +124,14 @@ async def _upload_custom(origin: str, target: str, target_filename: str, max_siz
         max_size(int): 最大文件大小, 大于的直接进行一个压缩 
     """
     if _config['storage'] == "local":
-        _origin = _resize_image(origin)
+        _origin = _resize_image(file=origin, max_size=max_size, k=0.9)
+        _origin.save(target + '/' + target_filename)
+        _origin.close()
 
+    else:
+        oss2.Bucket.put_object
         ...
+
+async def _aio_upload_oss():...
+
+async def __make_sign():...
