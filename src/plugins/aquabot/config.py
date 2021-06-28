@@ -30,7 +30,7 @@ _config['storage'] = global_config.aqua_bot_pic_storage
 
 _config['cache'] = global_config.aqua_bot_pic_cache_dir
 # 进行一个cqhttp地址的检测, 因为需要读取图片
-if _config['cqhttp'] in [None,""]:
+if not _config['cqhttp']:
     logger.error("未设置cqhttp路径, 请修改.env文件")
     exit()
 
@@ -91,7 +91,7 @@ else:
 # pixiv refresh_token 相关
 _config['pixiv'] = True
 _config['refresh_token'] = global_config.aqua_bot_pixiv_refresh_token
-if _config['refresh_token'] in [None,""]:
+if not _config['refresh_token']:
     logger.warning("没有设置pixiv refresh token, pixiv相关功能将不可用")
     _config['pixiv'] = False
 
@@ -101,7 +101,7 @@ _config['saucenao'] = True
 logger.error(type(global_config.AQUA_BOT_SAUCENAO_API))
 logger.error(_config['saucenao_api'])
 logger.error(type(_config['saucenao_api']))
-if _config['saucenao_api'] in [None,""]:
+if not _config['saucenao_api']:
     logger.warning("没有设置saucenao api, 搜图相关功能将不可用")
     _config['saucenao'] = False
 
@@ -113,5 +113,5 @@ if _config['language'] not in ['aqua','chinese','english','japanese']:
 
 
 
-def text(): ...
+
 
