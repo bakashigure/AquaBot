@@ -3,6 +3,7 @@
 试图实现一些阿里云OSS的异步操作
 """
 
+import re
 import oss2
 #from config import _config
 import hashlib
@@ -18,11 +19,22 @@ from email.utils import formatdate
 
 from keys import _config, __url
 
-prarms = dict()
-prarms['access_key_id'] = _config['access_key_id']
-prarms['access_key_secret'] = _config['access_key_secret']
-prarms['endpoint'] = _config['endpoint']
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
 
+_subresource_key_set = frozenset(
+    ['response-content-type', 'response-content-language',
+        'response-cache-control', 'logging', 'response-content-encoding',
+        'acl', 'uploadId', 'uploads', 'partNumber', 'group', 'link',
+        'delete', 'website', 'location', 'objectInfo', 'objectMeta',
+        'response-expires', 'response-content-disposition', 'cors', 'lifecycle',
+        'restore', 'qos', 'referer', 'stat', 'bucketInfo', 'append', 'position', 'security-token',
+        'live', 'comp', 'status', 'vod', 'startTime', 'endTime', 'x-oss-process',
+        'symlink', 'callback', 'callback-var', 'tagging', 'encryption', 'versions',
+        'versioning', 'versionId', 'policy', 'requestPayment', 'x-oss-traffic-limit', 'qosInfo', 'asyncFetch',
+        'x-oss-request-payer', 'sequential', 'inventory', 'inventoryId', 'continuation-token', 'callback',
+        'callback-var', 'worm', 'wormId', 'wormExtend', 'replication', 'replicationLocation',
+        'replicationProgress']
+)
 
 class _Base():
     def __init__(self, auth, endpoint, is_cname, session,
@@ -46,16 +58,16 @@ class _Base():
         VERB = method
         date = formatdate(usegmt=True)
         to_sign = "{0}\n\n\n{1}\n{2}".format(VERB, date, canonicalized_resource)
-        print("to_sign: %s"%to_sign)
+        print("to_sign: %s" % to_sign)
         _sig = hmac.new(to_bytes(self.auth.access_key_secret), to_bytes(to_sign), hashlib.sha1)
         signature = b64encode_as_string(_sig.digest())
         Authorization = "OSS " + self.auth.access_key_id + ":" + signature
-        logger.info("Authorization: %s"%Authorization)
+        logger.info("Authorization: %s" % Authorization)
         headers = dict()
         headers['authorization'] = Authorization
         headers['date'] = date
         headers['User-Agent'] = user_agent
-        logger.info("headers: %s"%headers)
+        logger.info("headers: %s" % headers)
         return headers
 
     def _make_url(self, bucket_name: str, key=''):
@@ -67,25 +79,25 @@ class _Base():
         headers = self._make_signature(method=method, key=key)
         print("url: ", url)
         async with httpx.AsyncClient() as client:
-            logger.info("kwargs: %s"%kwargs)
-            req = Request(method,url,headers=headers,**kwargs)
-            request = httpx.Request(req.method,req.url,data=req.data,headers=headers)
+            logger.info("kwargs: %s" % kwargs)
+            req = Request(method, url, headers=headers, **kwargs)
+            request = httpx.Request(req.method, req.url, data=req.data, headers=headers)
             print(request)
             r = await client.send(request)
-            logger.info("status_code: %s" %r.status_code)
-            logger.info("content: %s"%r.content) 
+            logger.info("status_code: %s" % r.status_code)
+            logger.info("content: %s" % r.content)
             return r
 
 
 class Request():
-    def __init__(self,method,url,
+    def __init__(self, method, url,
                  data=None,
                  params=None,
                  headers=None):
-        self.method=method
-        self.url=url
-        self.data=_convert_request_body(data)
-        self.params=params or {}
+        self.method = method
+        self.url = url
+        self.data = _convert_request_body(data)
+        self.params = params or {}
 
 
 def _convert_request_body(data):
@@ -136,26 +148,140 @@ class Bucket(_Base):
     async def put_object(self, key, data,
                          headers=None,
                          progress_callback=None):
-        return await self.do('PUT',self.bucket_name,key)
+        return await self.do('PUT', self.bucket_name, key)
 
-
-    async def put_object_from_file(self,key,filename,
+    async def put_object_from_file(self, key, filename,
                                    headers=None,
                                    progress_callback=None):
         async with aiofiles.open(filename, mode='rb') as f:
-            return await self.put_object(key,f,headers,progress_callback=progress_callback)
-   
+            return await self.put_object(key, f, headers, progress_callback=progress_callback)
+
+    async def list_objects(self, prefix='',
+                           delimiter='',
+                           marker='',
+                           max_keys=100,
+                           headers=None):
+        return await self.do('GET', self.bucket_name, '',
+                             params={'prefix': prefix,
+                                     'delimiter': delimiter,
+                                     'marker': marker,
+                                     'max_keys': max_keys,
+                                     'encoding-type': 'url'},
+                             headers=headers)
+
+    async def list_objects_v2(self, prefix='',
+                              delimiter='',
+                              continuation_token='',
+                              start_after='',
+                              fetch_owner=False,
+                              encoding_type='url',
+                              max_keys=100
+                              ):
+        resp = await self.do('GET', self.bucket_name, '',
+                             params={'list-type': '2',
+                                     'prefix': prefix,
+                                     'delimiter': delimiter,
+                                     'continuation-token': continuation_token,
+                                     'start-after': start_after,
+                                     'fetch-owner': str(fetch_owner).lower(),
+                                     'max-keys': str(max_keys),
+                                     'encoding-type': encoding_type}
+                             )
+        
+
+    '''
     async def append_object(): ...
-    async def list_objects(): ...
-    async def list_objects_v2(): ...
     async def sign_url(): ...
     async def put_object_with_url(): ...
     async def put_object_with_url_from_file(): ...
     async def select_object(): ...
+    '''
 
 
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+class _BaseIterator():
+    def __init__(self, marker, max_retries):
+        self.is_truncated = True
+        self.next_marker = marker
 
+        max_retries = 3 if max_retries == None else max_retries
+        self.max_retries = max_retries if max_retries > 0 else 1
+        self.entries = []
+
+    def _fetch(self):
+        raise NotImplemented
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while True:
+            if self.entries:
+                return self.entries.pop(0)
+
+            if not self.is_truncated:
+                raise StopIteration
+
+            self.fetch_with_retry()
+
+    def next(self):
+        return self.__next__()
+
+    def fetch_with_retry(self):
+        for i in range(self.max_retries):
+            try:
+                self.is_truncated, self.next_marker = self._fetch()
+            except Exception as e:
+                if e.status // 100 != 5:
+                    raise
+            else:
+                return
+
+
+class ObjectIteratorV2(_BaseIterator):
+    def __init__(self, bucket_name, prefix='', delimiter='',
+                 continuation_token='',
+                 start_after='',
+                 fetch_owner=False,
+                 encoding_type='url',
+                 max_keys=100,
+                 max_retries=None,
+                 headers=None):
+        super(ObjectIteratorV2, self).__init__(continuation_token,max_retries)
+        self.bucket_name=bucket_name
+        self.prefix=prefix
+        self.delimiter=delimiter
+        self.start_after=start_after
+        self.fetch_owner= fetch_owner
+        self.encoding_type= encoding_type
+        self.max_keys=max_keys
+        self.headers= headers
+    
+    def _fetch(self):
+        res = self.bucket.list_objects_v2(prefix=self.prefix,
+                                          delimiter=self.delimiter,
+                                          continuation_token=self.next_marker,
+                                          start_after=self.start_after,
+                                          fetch_owner=self.fetch_owner,
+                                          encoding_type=self.encoding_type,
+                                          max_keys=self.max_keys,
+                                          headers=self.headers)
+        
+        self.entries= res.object_list + [SimplifiedObjectInfo(prefix,None,None,None,None,None)
+                                        for prefix in res.prefix_list]
+        
+        self.entries.sort(key = lambda obj:obj.key)
+        return res.is_truncated, res.next_continuation_token
+class SimplifiedObjectInfo():
+    def __init__(self,key,last_modified,etag,type,size,storage_class,owner=None):
+        self.key= key
+        self.last_modified= last_modified
+        self.etag= etag
+        self.type= type
+        self.size= size
+        self.storage_class= storage_class
+        self.owner=owner
+    def is_prefix(self):
+        return self.last_modified is None
 
 def to_bytes(data):
     """若输入为str（即unicode），则转为utf-8编码的bytes；其他则原样返回"""
@@ -180,14 +306,25 @@ def to_string(data):
 async def main():
     auth = Auth(_config['access_key_id'], _config['access_key_secret'])
     bucket = Bucket(auth, _config['endpoint'], _config['bucket'])
-    #await bucket.get_object_to_file(key='img/aqua/10.jpg', filename=r'G:\10.jpg')
-    #await bucket.put_object_from_file(key='img/testt.jpg', filename=r'G:\10.jpg')
-    await bucket.put_object(key='img/ss.txt',data="test")
+    # await bucket.get_object_to_file(key='img/aqua/10.jpg', filename=r'G:\10.jpg')
+    # await bucket.put_object_from_file(key='img/testt.jpg', filename=r'G:\10.jpg')
+    # await bucket.put_object(key='img/ss.txt', data="test")
+    res = await bucket.list_objects_v2('img/aqua', continuation_token='2')
+
+
 def ossrun():
-    auth=oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
-    bucket=oss2.Bucket(auth, _config['endpoint'], _config['bucket'])
+    auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
+    bucket = oss2.Bucket(auth, _config['endpoint'], _config['bucket'])
 
-    bucket.put_object_from_file(key='img/through_oss.jpg', filename=r'G:\10.jpg')
-asyncio.run(main())
+    #bucket.put_object_from_file(key='img/through_oss.jpg', filename=r'G:\10.jpg')
+    res = bucket.list_objects_v2('img/aqua')
+    print('res: ',res)
+    print('res.next_continuation_token: ',res.next_continuation_token)
+    print('res.object_list: ', res.object_list)
+    print('res.is_truncated',res.is_truncated)
+    print('res.headers: ',res.headers)
 
-#ossrun()
+# asyncio.run(main())
+
+
+ossrun()
