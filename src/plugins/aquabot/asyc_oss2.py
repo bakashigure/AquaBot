@@ -36,6 +36,7 @@ _subresource_key_set = frozenset(
         'replicationProgress']
 )
 
+
 class _Base():
     def __init__(self, auth, endpoint, is_cname, session,
                  connect_timeout,
@@ -52,23 +53,33 @@ class _Base():
 
         self.prarms = dict()
 
-    def _make_signature(self, method, key):
-        canonicalized_resource = '/' + self.bucket_name + '/' + key
+    def _make_signature(self, method, bucket, date, key) -> str:
+        if not bucket:
+            canonicalized_resource = '/' + key
+        else:
+            canonicalized_resource = '/' + bucket + '/' + key
         content_type = 'text/html'
         VERB = method
-        date = formatdate(usegmt=True)
         to_sign = "{0}\n\n\n{1}\n{2}".format(VERB, date, canonicalized_resource)
         print("to_sign: %s" % to_sign)
         _sig = hmac.new(to_bytes(self.auth.access_key_secret), to_bytes(to_sign), hashlib.sha1)
         signature = b64encode_as_string(_sig.digest())
         Authorization = "OSS " + self.auth.access_key_id + ":" + signature
         logger.info("Authorization: %s" % Authorization)
-        headers = dict()
-        headers['authorization'] = Authorization
-        headers['date'] = date
-        headers['User-Agent'] = user_agent
-        logger.info("headers: %s" % headers)
-        return headers
+
+        return Authorization
+
+    def _make_headers(self, authorization, date):
+        _headers = dict()
+        _headers['authorization'] = authorization
+        _headers['date'] = date
+        _headers['User-Agent'] = user_agent
+        logger.info("headers: %s" % _headers)
+        '''
+        for k, v in kwargs.items():
+            _headers[k.lower()] = v
+        '''
+        return _headers
 
     def _make_url(self, bucket_name: str, key=''):
         u = urlparse(self.endpoint)
@@ -76,11 +87,13 @@ class _Base():
 
     async def do(self, method, bucket_name, key, **kwargs):
         url = self._make_url(bucket_name, key)
-        headers = self._make_signature(method=method, key=key)
-        print("url: ", url)
+        req = Request(method, url, **kwargs)
+
+        authorization = self._make_signature(method, self.bucket_name, req.date, req.canonicalized_resource)
+        headers = self._make_headers(authorization, req.date)
+
         async with httpx.AsyncClient() as client:
             logger.info("kwargs: %s" % kwargs)
-            req = Request(method, url, headers=headers, **kwargs)
             request = httpx.Request(req.method, req.url, data=req.data, headers=headers)
             print(request)
             r = await client.send(request)
@@ -98,6 +111,28 @@ class Request():
         self.url = url
         self.data = _convert_request_body(data)
         self.params = params or {}
+        self.date = self._make_date()
+        self.canonicalized_resource = ''
+        self.headers = params
+        print('params', params)
+
+        sub_params = dict()
+        if params:
+            for k, v in params.items():
+                if (_k := k.lower()) in _subresource_key_set:
+                    sub_params[_k] = v
+
+            print('sub_params',sub_params)
+
+        sorted(sub_params.items(),key=lambda x:x[0])
+        if sub_params:
+            self.canonicalized_resource = '?' + '&'.join(self.__param_to_query(k, v) for k, v in sub_params.items())
+
+    def _make_date(self) -> str:
+        return formatdate(usegmt=True)
+
+    def __param_to_query(self, k, v):
+        return k + '=' + v if v else k
 
 
 def _convert_request_body(data):
@@ -187,7 +222,7 @@ class Bucket(_Base):
                                      'max-keys': str(max_keys),
                                      'encoding-type': encoding_type}
                              )
-        
+        return resp
 
     '''
     async def append_object(): ...
@@ -246,16 +281,16 @@ class ObjectIteratorV2(_BaseIterator):
                  max_keys=100,
                  max_retries=None,
                  headers=None):
-        super(ObjectIteratorV2, self).__init__(continuation_token,max_retries)
-        self.bucket_name=bucket_name
-        self.prefix=prefix
-        self.delimiter=delimiter
-        self.start_after=start_after
-        self.fetch_owner= fetch_owner
-        self.encoding_type= encoding_type
-        self.max_keys=max_keys
-        self.headers= headers
-    
+        super(ObjectIteratorV2, self).__init__(continuation_token, max_retries)
+        self.bucket_name = bucket_name
+        self.prefix = prefix
+        self.delimiter = delimiter
+        self.start_after = start_after
+        self.fetch_owner = fetch_owner
+        self.encoding_type = encoding_type
+        self.max_keys = max_keys
+        self.headers = headers
+
     def _fetch(self):
         res = self.bucket.list_objects_v2(prefix=self.prefix,
                                           delimiter=self.delimiter,
@@ -265,23 +300,27 @@ class ObjectIteratorV2(_BaseIterator):
                                           encoding_type=self.encoding_type,
                                           max_keys=self.max_keys,
                                           headers=self.headers)
-        
-        self.entries= res.object_list + [SimplifiedObjectInfo(prefix,None,None,None,None,None)
-                                        for prefix in res.prefix_list]
-        
-        self.entries.sort(key = lambda obj:obj.key)
+
+        self.entries = res.object_list + [SimplifiedObjectInfo(prefix, None, None, None, None, None)
+                                          for prefix in res.prefix_list]
+
+        self.entries.sort(key=lambda obj: obj.key)
         return res.is_truncated, res.next_continuation_token
+
+
 class SimplifiedObjectInfo():
-    def __init__(self,key,last_modified,etag,type,size,storage_class,owner=None):
-        self.key= key
-        self.last_modified= last_modified
-        self.etag= etag
-        self.type= type
-        self.size= size
-        self.storage_class= storage_class
-        self.owner=owner
+    def __init__(self, key, last_modified, etag, type, size, storage_class, owner=None):
+        self.key = key
+        self.last_modified = last_modified
+        self.etag = etag
+        self.type = type
+        self.size = size
+        self.storage_class = storage_class
+        self.owner = owner
+
     def is_prefix(self):
         return self.last_modified is None
+
 
 def to_bytes(data):
     """若输入为str（即unicode），则转为utf-8编码的bytes；其他则原样返回"""
@@ -309,22 +348,22 @@ async def main():
     # await bucket.get_object_to_file(key='img/aqua/10.jpg', filename=r'G:\10.jpg')
     # await bucket.put_object_from_file(key='img/testt.jpg', filename=r'G:\10.jpg')
     # await bucket.put_object(key='img/ss.txt', data="test")
-    res = await bucket.list_objects_v2('img/aqua', continuation_token='2')
-
+    #res = await bucket.list_objects_v2('img/aqua')
+    res = await bucket.get_object('img/aqua/10.jpg')
+    print(res)
 
 def ossrun():
     auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
     bucket = oss2.Bucket(auth, _config['endpoint'], _config['bucket'])
 
     #bucket.put_object_from_file(key='img/through_oss.jpg', filename=r'G:\10.jpg')
-    res = bucket.list_objects_v2('img/aqua')
-    print('res: ',res)
-    print('res.next_continuation_token: ',res.next_continuation_token)
-    print('res.object_list: ', res.object_list)
-    print('res.is_truncated',res.is_truncated)
-    print('res.headers: ',res.headers)
+    #res = bucket.list_objects_v2('img/aqua')
+    res = bucket.get_object('img/aqua/10.jpg',process='image/auto-orient,1/quality,q_100/format,jpg')
+    print('res: ', res)
+    #print('res.next_continuation_token: ', res.next_continuation_token)
+    #print('res.object_list: ', res.object_list)
+    #print('res.is_truncated', res.is_truncated)
+    print('res.headers: ', res.headers)
 
-# asyncio.run(main())
-
-
+#asyncio.run(main())
 ossrun()
