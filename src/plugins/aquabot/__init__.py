@@ -20,6 +20,7 @@ plugin_config = Config(**global_config.dict())
 
 
 
+
 # logger.info(global_config)
 
 # logger.warning(type(global_config.aqua_bot_pic_storage))
@@ -32,6 +33,27 @@ _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
 aqua = on_command("qua", priority=5)
 args = list()
 
+def _on_start( record_file=''):
+    """每次启动时初始化图库, 并且动态维护图库.
+    数据量不大, 就不使用SQL了.
+
+    # TODO 
+    1. 本地存图的话, 维护一个json file?
+    2. oss怎么处理呢
+    """
+
+_on_start('')
+
+
+async def record_add(): ...
+async def record_modify(): ...
+async def record_delete(): ...
+
+async def misc():
+    """定时脚本
+    清理cache, 保存json.
+    """
+    ...
 
 @aqua.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
@@ -71,7 +93,9 @@ async def random_aqua(bot: Bot, event: Event):
 
     Returns:
     """
-    ...
+    if _config['storage'] == 'local':...
+    else:...
+
 
 
 
@@ -90,7 +114,9 @@ async def upload_aqua(bot: Bot, event: Event):
         pass
 
 
-async def delete_aqua(bot: Bot, event: Event): ...
+async def delete_aqua(bot: Bot, event: Event):
+    """删除一张夸图
+    """
 async def help_aqua(bot: Bot, event: Event): ...
 async def search_aqua(bot: Bot, event: Event): ...
 
