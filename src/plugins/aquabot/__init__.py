@@ -1,4 +1,3 @@
-import nonebot
 from nonebot import on_command
 from nonebot.rule import to_me
 from nonebot.typing import T_State
@@ -6,9 +5,10 @@ from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 import pixivpy3 as pixiv
 from .config import Config, prehandle
-import httpx
+from httpx import AsyncClient
 import operator
 import oss2
+from aiofiles import open as aiofiles_open
 from .utils import *
 from nonebot.adapters.cqhttp.utils import escape, unescape
 from .config import _config
@@ -33,20 +33,28 @@ _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
 aqua = on_command("qua", priority=5)
 args = list()
 
-def _on_start( record_file=''):
+def _on_start( record_file=_config['database']):
     """每次启动时初始化图库, 并且动态维护图库.
     数据量不大, 就不使用SQL了.
+    
+    
 
     # TODO 
     1. 本地存图的话, 维护一个json file?
     2. oss怎么处理呢
+    
     """
+    if not record_file:
+        logger.warning("record file not set")
+
+        
 
 _on_start('')
 
 
-async def record_add(): ...
+
 async def record_modify(): ...
+async def record_add(): ...
 async def record_delete(): ...
 
 async def misc():
@@ -152,7 +160,7 @@ async def pixiv_aqua(bot: Bot, event: Event):
         illust_list, key=operator.itemgetter('bookmark'))[::-1]
 
     _id = args[3]
-    async with httpx.AsyncClient() as client:
+    async with AsyncClient() as client:
         headers = {'Referer': 'https://www.pixiv.net/'}
         r = client.get(illust_list[_id])
 
