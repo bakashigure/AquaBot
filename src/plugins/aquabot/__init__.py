@@ -1,21 +1,25 @@
-from json.decoder import JSONDecodeError
+import json
 import operator
 from email.utils import formatdate
+from json.decoder import JSONDecodeError
+from pathlib import Path
 
+import nonebot
+import os
 import oss2
 import pixivpy3 as pixiv
 from aiofiles import open as aiofiles_open
 from httpx import AsyncClient
 from nonebot import on_command
 from nonebot.adapters import Bot, Event
-from nonebot.adapters.cqhttp.utils import escape, unescape
 from nonebot.log import logger
 from nonebot.rule import to_me
 from nonebot.typing import T_State
 
-from .config import Config, _config, prehandle
-from .utils import *
-__version__= '0.0.5'
+from .config import Config, _config
+from .utils import get_message_image, get_message_text, get_path
+
+__version__ = '0.0.6'
 logger.warning("IMPORT INIT")
 
 
@@ -34,98 +38,99 @@ _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
 
 class DB:
     '''
-    { 
+    {
+      "AquaBot": "this file created by aqua bot, please do not modify this file",
       "last_update": "", 
       "version": "",
+      "timestamp": "",
       "local": {
-            "pixiv_114514":"E://PATH//pixiv_114514.jpg",
-            "pixiv_1919810":"E://PATH//pixiv_1919810.jpg",
-            "114514_4gaw89":"E://PATH//114514_4gaw89.png",
+            {"pixiv_114514","E://path//pixiv_114514.jpg"},
+            {"pixiv_1919810","E://path//pixiv_1919810.jpg"},
+            {"114514_4gaw89", "E://path//114514_4gaw89.png"}
       },
-      "oss": {} }
+      "oss": {} 
+    }
     '''
-    def __init__(self, record_file) -> None:
+
+    def __init__(self,) -> None:
         self.db = None
         self.type = _config['storage']
+        self.lock = False
+        self.record_file=_config['database']
+
+        if self.type == 'oss':
+            self.auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
+            self.bucket = oss2.Bucket(self.auth, _config['endpoint'], _config['bucket'])
+
+        # 从配置文件中读取夸图数据库, 避免读取本地文件或者oss造成缓慢性能
+        # 如果配置文件不存在则生成一个
         try:
-            with open(record_file, 'r') as f:
+            with open(self.record_file, 'r') as f:
                 self.db = json.load(f)
+                print('DB: %s'%self.db)
         except FileNotFoundError:
-            logger.warning("record file not set, will create in %s" %record_file)
-            _init_content = r' {"last_update":"", "version":"", "local":{}, "oss":{} }'
-            with open(record_file, 'w') as f:
-                f.write(_init_content)
-            self.db = json.loads(_init_content)
+            logger.warning("record file not set, will create in %s" % self.record_file)
+            init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "version":"", "local":{}, "oss":{} }'
+            with open(self.record_file, 'w') as f:
+                f.write(init_content)
+            self.db = json.loads(init_content)
+            self.reload()
+            logger.warning('DB: %s'%self.db)
+            self.save()
+
         except JSONDecodeError as e:
-            logger.error('error reading record file, raw error -> %s'%e)
+            logger.error('error reading record file, raw error -> %s' % e)
             exit()
 
-    async def _update(self):...
-    async def add(self): ...
-    async def delete(self): ...
-    async def get_random(self):...
-    async def delete(self):...
+    def reload(self):
+        '''清空配置, 重新读取本地文件或oss.
+        '''
+        self.db['oss'] = {}
+        self.db['local'] = {}
+        self.last_update()
+        if self.type == 'local':
+            for _, _, files in os.walk(_config['dir']):
+                for f in files:
+                    self.add(f, Path(_config['dir']).joinpath(f).as_posix())
 
+        
+        ...
+
+    def last_update(self):
+        self.db['last_update'] = formatdate(usegmt=False)
+
+    def save(self):
+        with open(self.record_file, 'w') as f:
+            f.write(json.dumps(self.db))
+    def add(self, k, v):
+        self.db[self.type][k] = v
+
+    async def delete(self, k):
+        if k in self.db[self.type]:
+            del self.db[self.type][k]
+            logger.info('deleted record "%s"' % k)
+        else:
+            logger.warning('record "%s" not found' % k)
+
+    @classmethod
+    def set_type(cls, _type):
+        cls.type = _type
+
+    async def get_random(self): ...
+    async def delete(self): ...
+
+    def lock(self):
+        self.lock = True
+
+    def unlock(self):
+        self.lock = False
+
+
+DB.set_type(_config['storage'])
+db = DB()
 
 aqua = on_command("qua", priority=5)
 args = list()
-
-
-def _on_start(record_file=_config['database']):
-    """每次启动时初始化图库, 并且动态维护图库.
-    数据量不大, 就不使用SQL了.
-    """
-    if not record_file:
-        logger.warning("record file not set")
-    # open file
-        # 先判断文件是否存在, 如果存在, 则直接读取
-    # 如果不存在, 则创建并初始化
-    # 初始化图库
-    # 格式:
-    # {
-    #     "id1": {
-    #         "title": "",
-    #         "pic": "",
-    #         "tags": [],
-    #         "bookmarks": 0
-    #     },
-    #     "id2": {
-    #         "title": "",
-    #         "pic": "",
-    #         "tags": [],
-    #         "bookmarks": 0
-    #     }
-    # }
-    # 判断文件是否存在, 存在则直接读取
-    # 如果不存在, 则创建并初始化
-    try:
-        with open(record_file, 'r') as f:
-            db = json.load(f)
-    except FileNotFoundError:
-        _init_content = r' {"local":{},"oss":{} }'
-
-        with open(record_file, 'w') as f:
-            f.write(_init_content)
-    # 初始化
-    _message_hashmap = {
-        "id1": {
-            "title": "",
-            "pic": "",
-            "tags": [],
-            "bookmarks": 0
-        },
-        "id2": {
-            "title": "",
-            "pic": "",
-            "tags": [],
-            "bookmarks": 0
-        }
-    }
-    logger.warning("初始化图库")
-    return _message_hashmap
-
-
-_on_start('')
 
 
 async def misc():
