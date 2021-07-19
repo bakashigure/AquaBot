@@ -1,9 +1,9 @@
 """
-Define some useful functions for AquaBot
+Define some functions for AquaBot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
-
+from pathlib import Path
 import json
 from typing import Literal
 import nonebot
@@ -132,6 +132,20 @@ async def _upload_custom(origin: str, target: str, target_filename: str, max_siz
         oss2.Bucket.put_object
         ...
 
-async def _aio_upload_oss():...
 
-async def __make_sign():...
+async def _aio_upload_oss(): ...
+
+
+async def __make_sign(): ...
+
+
+async def safe_send(id: int, api: str, **message):
+    bot = _get_bot(id)
+    try:
+        await bot.call_api(api, message)
+    except Exception as e:
+        logger.error('fail to send message, error %s' % e)
+
+
+def get_path(path):
+    return Path(path).resolve()
