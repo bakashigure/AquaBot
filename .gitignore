@@ -8,9 +8,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#aqua bot
 keys.py
 .pep8
 data.txt
+img/
+database.json
+
 # C extensions
 *.so
 
@@ -142,3 +146,4 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+src/plugins/aquabot/test.py
