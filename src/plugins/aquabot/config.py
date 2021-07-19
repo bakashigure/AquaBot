@@ -27,7 +27,7 @@ _help_url = "https://example.com"
 
 _config['cqhttp'] = global_config.cqhttp
 _config['storage'] = global_config.aqua_bot_pic_storage
-
+_config['database'] = global_config.aqua_bot_pic_database
 _config['cache'] = global_config.aqua_bot_pic_cache_dir
 # 进行一个cqhttp地址的检测, 因为需要读取图片
 if not _config['cqhttp']:
