@@ -24,12 +24,12 @@ _config = dict()  # 读取配置
 _help_url = "https://example.com"
  
 
-
 _config['cqhttp'] = global_config.cqhttp
 _config['storage'] = global_config.aqua_bot_pic_storage
-_config['database'] = global_config.aqua_bot_pic_database
+_config['database'] = global_config.aqua_bot_database
 _config['cache'] = global_config.aqua_bot_pic_cache_dir
 # 进行一个cqhttp地址的检测, 因为需要读取图片
+
 if not _config['cqhttp']:
     logger.error("未设置cqhttp路径, 请修改.env文件")
     exit()
@@ -98,9 +98,6 @@ if not _config['refresh_token']:
 # saucenao api 相关
 _config['saucenao_api'] = global_config.AQUA_BOT_SAUCENAO_API
 _config['saucenao'] = True
-logger.error(type(global_config.AQUA_BOT_SAUCENAO_API))
-logger.error(_config['saucenao_api'])
-logger.error(type(_config['saucenao_api']))
 if not _config['saucenao_api']:
     logger.warning("没有设置saucenao api, 搜图相关功能将不可用")
     _config['saucenao'] = False
