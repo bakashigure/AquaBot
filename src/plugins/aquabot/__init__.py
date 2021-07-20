@@ -6,6 +6,7 @@ from pathlib import Path
 
 import nonebot
 import os
+from nonebot.adapters.cqhttp.event import MessageEvent
 import oss2
 import pixivpy3 as pixiv
 from aiofiles import open as aiofiles_open
@@ -15,6 +16,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 from nonebot.rule import to_me
 from nonebot.typing import T_State
+from nonebot.adapters.cqhttp import MessageSegment
 
 from .config import Config, _config
 from .utils import get_message_image, get_message_text, get_path
@@ -33,7 +35,25 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
+ACTION_SUCCESS = 200
+ACTION_WARNING = 300
+ACTION_FAILED = 400
+
 _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
+
+
+class Response():
+    def __init__(self, code, msg) -> None:
+        self.code=code
+        self.msg=msg
+
+        if self.code // 100 == 2:
+            logger.info(f"{self.code} {self.msg}")
+        elif self.code // 100 == 3:
+            logger.warning(f"{self.code} {self.msg}")
+        elif self.code // 100 == 4:
+            logger.error(f"{self.code} {self.msg}")
+
 
 
 class DB:
@@ -52,11 +72,14 @@ class DB:
     }
     '''
 
-    def __init__(self,) -> None:
+    def __init__(self) -> None:
         self.db = None
         self.type = _config['storage']
-        self.lock = False
-        self.record_file=_config['database']
+        self._lock = False
+        self.record_file = _config['database']
+
+        self.cnt=0
+        self.used=0
 
         if self.type == 'oss':
             self.auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
@@ -67,7 +90,7 @@ class DB:
         try:
             with open(self.record_file, 'r') as f:
                 self.db = json.load(f)
-                print('DB: %s'%self.db)
+                print('DB: %s' % self.db)
         except FileNotFoundError:
             logger.warning("record file not set, will create in %s" % self.record_file)
             init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "version":"", "local":{}, "oss":{} }'
@@ -75,55 +98,99 @@ class DB:
                 f.write(init_content)
             self.db = json.loads(init_content)
             self.reload()
-            logger.warning('DB: %s'%self.db)
+            logger.warning('DB: %s' % self.db)
             self.save()
-
         except JSONDecodeError as e:
             logger.error('error reading record file, raw error -> %s' % e)
             exit()
 
-    def reload(self):
+    def reload(self) -> Response:
         '''清空配置, 重新读取本地文件或oss.
         '''
-        self.db['oss'] = {}
-        self.db['local'] = {}
-        self.last_update()
-        if self.type == 'local':
-            for _, _, files in os.walk(_config['dir']):
-                for f in files:
-                    self.add(f, Path(_config['dir']).joinpath(f).as_posix())
+        try:
+            self.lock()
+            self.db['oss'] = {}
+            self.db['local'] = {}
+            self.last_update()
+            if self.type == 'local':
+                for _, _, files in os.walk(_config['dir']):
+                    [self.add(f, Path(_config['dir']).joinpath(f).as_posix()) for f in files]
+            else:
+                # TODO READ OSS FILE LIST
+                # OSS2.LISTOBJECTSV2
+                ...
 
+            return Response(ACTION_SUCCESS, 'reload success')
         
+        except Exception as e:
+            return Response(ACTION_FAILED, 'reload failed')
+
+        finally:
+            self.unlock()
+
         ...
 
     def last_update(self):
+        '''更新'last_update'字段
+        '''
         self.db['last_update'] = formatdate(usegmt=False)
 
-    def save(self):
-        with open(self.record_file, 'w') as f:
-            f.write(json.dumps(self.db))
+    def save(self) -> Response:
+        '''保存数据库到本地文件
+        '''
+        if not self.lock:
+            self.lock()
+            with open(self.record_file, 'w') as f:
+                f.write(json.dumps(self.db))
+            self.unlock()
+
+            return Response(ACTION_SUCCESS, 'save success')
+        else:
+            logger.warning('database is now locked.')
+
     def add(self, k, v):
         self.db[self.type][k] = v
 
-    async def delete(self, k):
+    async def delete(self, k) -> Response:
+        _code = ACTION_SUCCESS
+        _msg = ''
+
+        try:
+            self.lock()
+            if self.type == 'oss':
+                await self.bucket.delete_object(self.db[self.type][k])
+            else:
+                try:
+                    os.remove(self.db[self.type][k])
+                    _msg += 'file "%s" deleted,'%k
+                except:
+                    _msg += 'failed to delete file "%s",'%k
+                    _code = ACTION_FAILED
+        finally:
+            self.unlock()
+
         if k in self.db[self.type]:
             del self.db[self.type][k]
             logger.info('deleted record "%s"' % k)
+            _msg += 'record "%s" deleted,'%k
         else:
             logger.warning('record "%s" not found' % k)
+            _msg += 'record "%s" not found,' %k
+
+        return Response(_code, _msg)
 
     @classmethod
     def set_type(cls, _type):
         cls.type = _type
 
     async def get_random(self): ...
-    async def delete(self): ...
+
 
     def lock(self):
-        self.lock = True
+        self._lock = True
 
     def unlock(self):
-        self.lock = False
+        self._lock = False
 
 
 DB.set_type(_config['storage'])
@@ -154,6 +221,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "help": lambda: help_aqua(bot, event),
             "pixiv": lambda: pixiv_aqua(bot, event),
             "test": lambda: test_aqua(bot, event),
+            "reload": lambda: reload_aqua(bot, event)
 
         }
         return await optdict[option]()
@@ -166,8 +234,6 @@ async def bott(bot: Bot, event=Event, state=T_State):
     await aqua.finish("nope")
 
 
-async def _get_aqua_pic(): ...
-
 
 async def random_aqua(bot: Bot, event: Event):
     """随机发送一张夸图
@@ -178,10 +244,7 @@ async def random_aqua(bot: Bot, event: Event):
 
     Returns:
     """
-    if _config['storage'] == 'local':
-        ...
-    else:
-        ...
+    db.get_random() 
 
 
 async def upload_aqua(bot: Bot, event: Event):
@@ -202,6 +265,10 @@ async def upload_aqua(bot: Bot, event: Event):
 async def delete_aqua(bot: Bot, event: Event):
     """删除一张夸图
     """
+    print(event.json)
+    print(event)
+    r = await db.delete(args[1])
+    await bot.send(event,r.msg)
 
 
 async def help_aqua(bot: Bot, event: Event): ...
@@ -253,3 +320,7 @@ async def more_aqua(): ...
 
 async def one_aqua(bot: Bot, event: Event):
     return await random_aqua(bot, event)
+
+async def reload_aqua(bot:Bot, event:Event):
+    return db.reload()
+    MessageSegment.reply()
