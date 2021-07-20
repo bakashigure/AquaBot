@@ -139,12 +139,13 @@ async def _aio_upload_oss(): ...
 async def __make_sign(): ...
 
 
-async def safe_send(id: int, api: str, **message):
+async def _safe_send(id: int, api: str, **message):
     bot = _get_bot(id)
     try:
         await bot.call_api(api, message)
     except Exception as e:
         logger.error('fail to send message, error %s' % e)
+
 
 
 def get_path(path):
