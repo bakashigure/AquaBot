@@ -22,7 +22,7 @@ from .config import Config, _config
 from .utils import get_message_image, get_message_text, get_path
 
 __version__ = '0.0.6'
-logger.warning("IMPORT INIT")
+logger.warning("IMPORT AQUABOT")
 
 
 global_config = nonebot.get_driver().config
@@ -221,18 +221,19 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "help": lambda: help_aqua(bot, event),
             "pixiv": lambda: pixiv_aqua(bot, event),
             "test": lambda: test_aqua(bot, event),
-            "reload": lambda: reload_aqua(bot, event)
+            "reload": lambda: reload_aqua(bot, event),
+            "debug": lambda: debug(bot,event)
 
         }
         return await optdict[option]()
 
     await switch(args[0], bot, event)
 
-
+'''
 @aqua.got("qua", prompt="114514")
 async def bott(bot: Bot, event=Event, state=T_State):
     await aqua.finish("nope")
-
+'''
 
 
 async def random_aqua(bot: Bot, event: Event):
@@ -244,7 +245,7 @@ async def random_aqua(bot: Bot, event: Event):
 
     Returns:
     """
-    db.get_random() 
+    res = db.get_random() 
 
 
 async def upload_aqua(bot: Bot, event: Event):
@@ -267,8 +268,15 @@ async def delete_aqua(bot: Bot, event: Event):
     """
     print(event.json)
     print(event)
-    r = await db.delete(args[1])
-    await bot.send(event,r.msg)
+    res = await db.delete(args[1])
+    answer = MessageSegment.reply(event.message_id)+MessageSegment.text(res.msg)
+    await bot.send(event,answer)
+
+
+async def debug(bot:Bot, event:Event):
+    cmd = " ".join(args[1:])
+    print(cmd)
+    print(eval(cmd))
 
 
 async def help_aqua(bot: Bot, event: Event): ...
