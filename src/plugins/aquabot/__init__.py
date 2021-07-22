@@ -3,6 +3,7 @@ import operator
 from email.utils import formatdate
 from json.decoder import JSONDecodeError
 from pathlib import Path
+from random import randint
 
 import nonebot
 import os
@@ -44,16 +45,16 @@ _message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
 
 class Response():
     def __init__(self, code, msg) -> None:
-        self.code=code
-        self.msg=msg
+        self.code = code
+        self.msg = msg
 
+        log = f"{self.code} | {self.msg}"
         if self.code // 100 == 2:
-            logger.info(f"{self.code} {self.msg}")
+            logger.info(log)
         elif self.code // 100 == 3:
-            logger.warning(f"{self.code} {self.msg}")
+            logger.warning(log)
         elif self.code // 100 == 4:
-            logger.error(f"{self.code} {self.msg}")
-
+            logger.error(log)
 
 
 class DB:
@@ -61,25 +62,30 @@ class DB:
     {
       "AquaBot": "this file created by aqua bot, please do not modify this file",
       "last_update": "", 
-      "version": "",
-      "timestamp": "",
+      "records": "",
+      "version":"",
       "local": {
             {"pixiv_114514","E://path//pixiv_114514.jpg"},
             {"pixiv_1919810","E://path//pixiv_1919810.jpg"},
             {"114514_4gaw89", "E://path//114514_4gaw89.png"}
       },
-      "oss": {} 
+      "oss": {} ,
+      "used": {}
     }
     '''
 
     def __init__(self) -> None:
-        self.db = None
-        self.type = _config['storage']
-        self._lock = False
-        self.record_file = _config['database']
+        self.db = None  # 本体
+        self.db_keys = []
+        self.type = _config['storage']  # 存储类型, 'oss' or 'local'
+        self.record_file = _config['database']  # 记录文件路径
 
-        self.cnt=0
-        self.used=0
+        self.db_total = 0  # 图片总数
+        self.db_available = 0  # 可用图片数
+        self.db_used = {}  # 已发送的, 等待回收
+
+        self._lock = False
+        self.__version__ = '1.0.0'
 
         if self.type == 'oss':
             self.auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
@@ -91,18 +97,37 @@ class DB:
             with open(self.record_file, 'r') as f:
                 self.db = json.load(f)
                 print('DB: %s' % self.db)
+
         except FileNotFoundError:
             logger.warning("record file not set, will create in %s" % self.record_file)
-            init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "version":"", "local":{}, "oss":{} }'
+            init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "records":"", "version":"", "local":{}, "oss":{} }'
             with open(self.record_file, 'w') as f:
                 f.write(init_content)
             self.db = json.loads(init_content)
             self.reload()
+            self.db['version'] = self.__version__
+            self.last_update()
             logger.warning('DB: %s' % self.db)
             self.save()
+
         except JSONDecodeError as e:
-            logger.error('error reading record file, raw error -> %s' % e)
+            logger.error('JSON decode error -> %s' % e)
             exit()
+
+
+
+        self.refresh()
+
+    def refresh(self) -> Response:
+        '''把发过的图片重新添加到图库
+        '''
+        self.db[self.type].update(self.db['used'])
+        self.db['used'] = {}
+        self.db_keys = self.db[self.type].keys()
+        self.db_total = len(self.db_keys)
+        self.db_available = self.db_total
+        self.last_update()
+        return Response(ACTION_SUCCESS, 'refresh success, db_total:%s' % self.db_total)
 
     def reload(self) -> Response:
         '''清空配置, 重新读取本地文件或oss.
@@ -111,7 +136,8 @@ class DB:
             self.lock()
             self.db['oss'] = {}
             self.db['local'] = {}
-            self.last_update()
+            self.db['used'] = {}
+
             if self.type == 'local':
                 for _, _, files in os.walk(_config['dir']):
                     [self.add(f, Path(_config['dir']).joinpath(f).as_posix()) for f in files]
@@ -120,8 +146,9 @@ class DB:
                 # OSS2.LISTOBJECTSV2
                 ...
 
+            self.refresh()
             return Response(ACTION_SUCCESS, 'reload success')
-        
+
         except Exception as e:
             return Response(ACTION_FAILED, 'reload failed')
 
@@ -130,10 +157,11 @@ class DB:
 
         ...
 
-    def last_update(self):
+    def last_update(self) -> Response:
         '''更新'last_update'字段
         '''
         self.db['last_update'] = formatdate(usegmt=False)
+        return Response(ACTION_SUCCESS, 'last_update: %s' % self.db['last_update'])
 
     def save(self) -> Response:
         '''保存数据库到本地文件
@@ -146,12 +174,15 @@ class DB:
 
             return Response(ACTION_SUCCESS, 'save success')
         else:
-            logger.warning('database is now locked.')
+            return Response(ACTION_WARNING, 'database is locked')
 
-    def add(self, k, v):
+    def add(self, k, v) -> Response:
+        if not k in self.db[self.type]:
+            self.db_total += 1
         self.db[self.type][k] = v
+        return Response(ACTION_SUCCESS, 'add record: %s -> %s' % (k, v))
 
-    async def delete(self, k) -> Response:
+    async def delete(self, k: str) -> Response:
         _code = ACTION_SUCCESS
         _msg = ''
 
@@ -162,29 +193,32 @@ class DB:
             else:
                 try:
                     os.remove(self.db[self.type][k])
-                    _msg += 'file "%s" deleted,'%k
+                    _msg += 'file "%s" deleted,' % k
                 except:
-                    _msg += 'failed to delete file "%s",'%k
+                    _msg += 'failed to delete file "%s",' % k
                     _code = ACTION_FAILED
         finally:
             self.unlock()
 
         if k in self.db[self.type]:
             del self.db[self.type][k]
-            logger.info('deleted record "%s"' % k)
-            _msg += 'record "%s" deleted,'%k
+            logger.info('delete record "%s"' % k)
+            _msg += 'record "%s" deleted,' % k
         else:
             logger.warning('record "%s" not found' % k)
-            _msg += 'record "%s" not found,' %k
+            _msg += 'record "%s" not found,' % k
 
         return Response(_code, _msg)
 
     @classmethod
-    def set_type(cls, _type):
+    def set_type(cls, _type) -> None:
         cls.type = _type
 
-    async def get_random(self): ...
-
+    async def get_random(self) -> Response:
+        if self.db_available == 0:
+            Response(ACTION_FAILED, 'no record available')
+            self.refresh() # 即刻触发refresh
+        choice = randint(0, self.db_total - 1)
 
     def lock(self):
         self._lock = True
@@ -222,7 +256,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "pixiv": lambda: pixiv_aqua(bot, event),
             "test": lambda: test_aqua(bot, event),
             "reload": lambda: reload_aqua(bot, event),
-            "debug": lambda: debug(bot,event)
+            "debug": lambda: debug(bot, event)
 
         }
         return await optdict[option]()
@@ -245,7 +279,7 @@ async def random_aqua(bot: Bot, event: Event):
 
     Returns:
     """
-    res = db.get_random() 
+    res = db.get_random()
 
 
 async def upload_aqua(bot: Bot, event: Event):
@@ -269,11 +303,11 @@ async def delete_aqua(bot: Bot, event: Event):
     print(event.json)
     print(event)
     res = await db.delete(args[1])
-    answer = MessageSegment.reply(event.message_id)+MessageSegment.text(res.msg)
-    await bot.send(event,answer)
+    answer = MessageSegment.reply(event.message_id) + MessageSegment.text(res.msg)
+    await bot.send(event, answer)
 
 
-async def debug(bot:Bot, event:Event):
+async def debug(bot: Bot, event: Event):
     cmd = " ".join(args[1:])
     print(cmd)
     print(eval(cmd))
@@ -286,6 +320,12 @@ async def search_aqua(bot: Bot, event: Event): ...
 async def pixiv_aqua(bot: Bot, event: Event):
     api = pixiv.AppPixivAPI()
     api.set_accept_language('en_us')
+    _duration = {
+        "day": "within_last_day",
+        "week": "within_last_week",
+        "month": "within_last_month"
+    }
+
     try:
         api.auth(refresh_token=_config['refresh_token'])
     except Exception as e:
@@ -294,12 +334,6 @@ async def pixiv_aqua(bot: Bot, event: Event):
     if args[1] not in ['day', 'week', 'month']:
         logger.error("参数错误, 详见/aqua help pixiv")
         # todo
-
-    _duration = {
-        "day": "within_last_day",
-        "week": "within_last_week",
-        "month": "within_last_month"
-    }
 
     res_json = api.search_illust(
         word="湊あくあ", search_target="exact_match_for_tags", sort="date_asc", duration=_duration[args[1]])
@@ -329,6 +363,7 @@ async def more_aqua(): ...
 async def one_aqua(bot: Bot, event: Event):
     return await random_aqua(bot, event)
 
-async def reload_aqua(bot:Bot, event:Event):
+
+async def reload_aqua(bot: Bot, event: Event):
     return db.reload()
     MessageSegment.reply()
