@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "D:\\Anaconda3_2020_11\\envs\\Nonebot\\python.exe"
+    "python.pythonPath": "D:\\Anaconda3_2020_11\\envs\\Nonebot\\python.exe",
+    "python.formatting.provider": "autopep8"
 }
