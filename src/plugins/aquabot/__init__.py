@@ -20,9 +20,17 @@ from nonebot.typing import T_State
 from nonebot.adapters.cqhttp import MessageSegment
 
 from .config import Config, _config
-from .utils import get_message_image, get_message_text, get_path
+from .utils import (
+    get_message_image,
+    get_message_text,
+    get_path,
+    Response,
+    ACTION_FAILED,
+    ACTION_SUCCESS,
+    ACTION_WARNING,
+)
 
-__version__ = '0.0.6'
+__version__ = "0.0.6"
 logger.warning("IMPORT AQUABOT")
 
 
@@ -36,29 +44,8 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
-ACTION_SUCCESS = 200
-ACTION_WARNING = 300
-ACTION_FAILED = 400
-
-_message_hashmap = dict()  # 记录bot发送的message_id与夸图id的键值对
-
-
-class Response():
-    def __init__(self, code, msg) -> None:
-        self.code = code
-        self.msg = msg
-
-        log = f"{self.code} | {self.msg}"
-        if self.code // 100 == 2:
-            logger.info(log)
-        elif self.code // 100 == 3:
-            logger.warning(log)
-        elif self.code // 100 == 4:
-            logger.error(log)
-
-
 class DB:
-    '''
+    """
     {
       "AquaBot": "this file created by aqua bot, please do not modify this file",
       "last_update": "", 
@@ -72,85 +59,95 @@ class DB:
       "oss": {} ,
       "used": {}
     }
-    '''
+    """
 
     def __init__(self) -> None:
         self.db = None  # 本体
         self.db_keys = []
-        self.type = _config['storage']  # 存储类型, 'oss' or 'local'
-        self.record_file = _config['database']  # 记录文件路径
+        self.type = _config["storage"]  # 存储类型, 'oss' or 'local'
+        self.record_file = _config["database"]  # 记录文件路径
 
         self.db_total = 0  # 图片总数
         self.db_available = 0  # 可用图片数
         self.db_used = {}  # 已发送的, 等待回收
 
-        self._lock = False
-        self.__version__ = '1.0.0'
+        self.messages = dict()  # 记录bot发送的message_id与夸图id的键值对
 
-        if self.type == 'oss':
-            self.auth = oss2.Auth(_config['access_key_id'], _config['access_key_secret'])
-            self.bucket = oss2.Bucket(self.auth, _config['endpoint'], _config['bucket'])
+        self._lock = False
+        self.__version__ = "1.0.0"
+
+        if self.type == "oss":
+            self.auth = oss2.Auth(
+                _config["access_key_id"], _config["access_key_secret"]
+            )
+            self.bucket = oss2.Bucket(self.auth, _config["endpoint"], _config["bucket"])
 
         # 从配置文件中读取夸图数据库, 避免读取本地文件或者oss造成缓慢性能
         # 如果配置文件不存在则生成一个
         try:
-            with open(self.record_file, 'r') as f:
+            with open(self.record_file, "r") as f:
                 self.db = json.load(f)
-                print('DB: %s' % self.db)
+                print("DB: %s" % self.db)
 
         except FileNotFoundError:
             logger.warning("record file not set, will create in %s" % self.record_file)
             init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "records":"", "version":"", "local":{}, "oss":{} }'
-            with open(self.record_file, 'w') as f:
+            with open(self.record_file, "w") as f:
                 f.write(init_content)
             self.db = json.loads(init_content)
             self.reload()
-            self.db['version'] = self.__version__
+            self.db["version"] = self.__version__
             self.last_update()
-            logger.warning('DB: %s' % self.db)
+            logger.warning("DB: %s" % self.db)
             self.save()
 
         except JSONDecodeError as e:
-            logger.error('JSON decode error -> %s' % e)
+            logger.error("JSON decode error -> %s" % e)
             exit()
-
-
 
         self.refresh()
 
     def refresh(self) -> Response:
-        '''把发过的图片重新添加到图库
-        '''
-        self.db[self.type].update(self.db['used'])
-        self.db['used'] = {}
+        """把发过的图片重新添加到图库
+        """
+        self.db[self.type].update(self.db["used"])
+        self.db["used"] = {}
         self.db_keys = self.db[self.type].keys()
         self.db_total = len(self.db_keys)
         self.db_available = self.db_total
         self.last_update()
-        return Response(ACTION_SUCCESS, 'refresh success, db_total:%s' % self.db_total)
+        return Response(ACTION_SUCCESS, "refresh success, db_total:%s" % self.db_total)
 
     def reload(self) -> Response:
-        '''清空配置, 重新读取本地文件或oss.
-        '''
+        """清空配置, 重新读取本地文件或oss.
+        """
+        if self._lock:
+            return Response(ACTION_FAILED, "database is now locked")
+
         try:
             self.lock()
-            self.db['oss'] = {}
-            self.db['local'] = {}
-            self.db['used'] = {}
+            self.db["oss"] = {}
+            self.db["local"] = {}
+            self.db["used"] = {}
 
-            if self.type == 'local':
-                for _, _, files in os.walk(_config['dir']):
-                    [self.add(f, Path(_config['dir']).joinpath(f).as_posix()) for f in files]
+            if self.type == "local":
+                for _, _, files in os.walk(_config["dir"]):
+                    [
+                        self.add(
+                            "file:///" + f, Path(_config["dir"]).joinpath(f).as_posix()
+                        )
+                        for f in files
+                    ]
             else:
                 # TODO READ OSS FILE LIST
                 # OSS2.LISTOBJECTSV2
                 ...
 
             self.refresh()
-            return Response(ACTION_SUCCESS, 'reload success')
+            return Response(ACTION_SUCCESS, "reload success")
 
         except Exception as e:
-            return Response(ACTION_FAILED, 'reload failed')
+            return Response(ACTION_FAILED, "reload failed")
 
         finally:
             self.unlock()
@@ -158,37 +155,37 @@ class DB:
         ...
 
     def last_update(self) -> Response:
-        '''更新'last_update'字段
-        '''
-        self.db['last_update'] = formatdate(usegmt=False)
-        return Response(ACTION_SUCCESS, 'last_update: %s' % self.db['last_update'])
+        """更新'last_update'字段
+        """
+        self.db["last_update"] = formatdate(usegmt=False)
+        return Response(ACTION_SUCCESS, "last_update: %s" % self.db["last_update"])
 
     def save(self) -> Response:
-        '''保存数据库到本地文件
-        '''
+        """保存数据库到本地文件
+        """
         if not self.lock:
             self.lock()
-            with open(self.record_file, 'w') as f:
+            with open(self.record_file, "w") as f:
                 f.write(json.dumps(self.db))
             self.unlock()
 
-            return Response(ACTION_SUCCESS, 'save success')
+            return Response(ACTION_SUCCESS, "save success")
         else:
-            return Response(ACTION_WARNING, 'database is locked')
+            return Response(ACTION_WARNING, "database is locked")
 
     def add(self, k, v) -> Response:
         if not k in self.db[self.type]:
             self.db_total += 1
         self.db[self.type][k] = v
-        return Response(ACTION_SUCCESS, 'add record: %s -> %s' % (k, v))
+        return Response(ACTION_SUCCESS, "add record: %s -> %s" % (k, v))
 
     async def delete(self, k: str) -> Response:
         _code = ACTION_SUCCESS
-        _msg = ''
+        _msg = ""
 
         try:
             self.lock()
-            if self.type == 'oss':
+            if self.type == "oss":
                 await self.bucket.delete_object(self.db[self.type][k])
             else:
                 try:
@@ -216,18 +213,27 @@ class DB:
 
     async def get_random(self) -> Response:
         if self.db_available == 0:
-            Response(ACTION_FAILED, 'no record available')
-            self.refresh() # 即刻触发refresh
+            Response(ACTION_FAILED, "no record available, will refresh records")
+            self.refresh()  # 即刻触发refresh
+            if self.db_total == 0:
+                return Response(ACTION_FAILED, "no record available")
         choice = randint(0, self.db_total - 1)
+        key = self.db_keys[choice]
+        value = self.db[self.type][key]
+        self.db_available -= 1
+        self.db["used"][key] = value
+        del self.db[self.type][key]
 
-    def lock(self):
+        return Response(ACTION_SUCCESS, "%s" % value)
+
+    def lock(self) -> None:
         self._lock = True
 
-    def unlock(self):
+    def unlock(self) -> None:
         self._lock = False
 
 
-DB.set_type(_config['storage'])
+DB.set_type(_config["storage"])
 db = DB()
 
 aqua = on_command("qua", priority=5)
@@ -256,40 +262,47 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "pixiv": lambda: pixiv_aqua(bot, event),
             "test": lambda: test_aqua(bot, event),
             "reload": lambda: reload_aqua(bot, event),
-            "debug": lambda: debug(bot, event)
-
+            "debug": lambda: debug(bot, event),
         }
         return await optdict[option]()
 
     await switch(args[0], bot, event)
 
-'''
+
+"""
 @aqua.got("qua", prompt="114514")
 async def bott(bot: Bot, event=Event, state=T_State):
     await aqua.finish("nope")
-'''
+"""
 
 
 async def random_aqua(bot: Bot, event: Event):
     """随机发送一张夸图
 
-    Args:
-        bot (Bot): bot实例
-        event (Event): 事件
+    Args :
+        >>> bot (Bot): bot实例
+        >>> event (Event): 事件
 
     Returns:
     """
-    res = db.get_random()
+    res = await db.get_random()
+    if res.code // 100 == 2:
+        _msg = MessageSegment.image(res.msg)
+        await bot.send(event, _msg)
+    else:
+        await bot.send(event, MessageSegment.text("no available images!"))
 
 
 async def upload_aqua(bot: Bot, event: Event):
     """上传一张图片
     """
-    if _config['storage'] == "local":
+    if _config["storage"] == "local":
         # logger.warning(args)
         # logger.warning(event.json())
 
-        c = await get_message_image(data=event.json(), type='file', path=_config['cqhttp'])
+        c = await get_message_image(
+            data=event.json(), type="file", path=_config["cqhttp"]
+        )
         logger.warning(c)
 
         pass
@@ -313,43 +326,59 @@ async def debug(bot: Bot, event: Event):
     print(eval(cmd))
 
 
-async def help_aqua(bot: Bot, event: Event): ...
-async def search_aqua(bot: Bot, event: Event): ...
+async def help_aqua(bot: Bot, event: Event):
+    ...
+
+
+async def search_aqua(bot: Bot, event: Event):
+    ...
 
 
 async def pixiv_aqua(bot: Bot, event: Event):
+    try:
+        _,_,_dur,_id = args
+    except ValueError:
+        pass
+
     api = pixiv.AppPixivAPI()
-    api.set_accept_language('en_us')
+    api.set_accept_language("en_us")
     _duration = {
         "day": "within_last_day",
         "week": "within_last_week",
-        "month": "within_last_month"
+        "month": "within_last_month",
     }
 
     try:
-        api.auth(refresh_token=_config['refresh_token'])
+        api.auth(refresh_token=_config["refresh_token"])
     except Exception as e:
         logger.error(e)
 
-    if args[1] not in ['day', 'week', 'month']:
+    if args[1] not in ["day", "week", "month"]:
         logger.error("参数错误, 详见/aqua help pixiv")
         # todo
 
     res_json = api.search_illust(
-        word="湊あくあ", search_target="exact_match_for_tags", sort="date_asc", duration=_duration[args[1]])
+        word="湊あくあ",
+        search_target="exact_match_for_tags",
+        sort="date_asc",
+        duration=_duration[args[1]],
+    )
 
     illust_list = []
     for illust in res_json.illusts:
-        __dict = {'title': illust.title, 'id': illust.id, 'bookmark': int(
-            illust.total_bookmarks), 'large_url': illust.image_urls['large']}
+        __dict = {
+            "title": illust.title,
+            "id": illust.id,
+            "bookmark": int(illust.total_bookmarks),
+            "large_url": illust.image_urls["large"],
+        }
         illust_list.append(__dict)
 
-    illust_list = sorted(
-        illust_list, key=operator.itemgetter('bookmark'))[::-1]
+    illust_list = sorted(illust_list, key=operator.itemgetter("bookmark"))[::-1]
 
     _id = args[3]
     async with AsyncClient() as client:
-        headers = {'Referer': 'https://www.pixiv.net/'}
+        headers = {"Referer": "https://www.pixiv.net/"}
         r = client.get(illust_list[_id])
 
 
@@ -357,7 +386,8 @@ async def test_aqua(bot: Bot, event: Event):
     await bot.send(event=event, message="i got test")
 
 
-async def more_aqua(): ...
+async def more_aqua():
+    ...
 
 
 async def one_aqua(bot: Bot, event: Event):
@@ -367,3 +397,18 @@ async def one_aqua(bot: Bot, event: Event):
 async def reload_aqua(bot: Bot, event: Event):
     return db.reload()
     MessageSegment.reply()
+
+
+async def upload_by_reply(bot: Bot, event: Event):
+    """上传图片
+    """
+    if _config["storage"] == "local":
+        # logger.warning(args)
+        # logger.warning(event.json())
+
+        c = await get_message_image(data=event.json(), type="file", path=_config["cqhttp"])
+        logger.warning(c)
+
+        pass
+    else:
+        pass

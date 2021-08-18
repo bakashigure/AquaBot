@@ -147,3 +147,6 @@ dmypy.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 src/plugins/aquabot/test.py
+.vscode/settings.json
+settings.json
+.vscode/settings.json
