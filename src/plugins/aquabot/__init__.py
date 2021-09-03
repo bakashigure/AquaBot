@@ -4,6 +4,7 @@ from email.utils import formatdate
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from random import randint
+from threading import Lock
 
 import nonebot
 import os
@@ -73,7 +74,6 @@ class DB:
 
         self.messages = dict()  # 记录bot发送的message_id与夸图id的键值对
 
-        self._lock = False
         self.__version__ = "1.0.0"
 
         if self.type == "oss":
@@ -121,8 +121,6 @@ class DB:
     def reload(self) -> Response:
         """清空配置, 重新读取本地文件或oss.
         """
-        if self._lock:
-            return Response(ACTION_FAILED, "database is now locked")
 
         try:
             self.lock()
@@ -147,10 +145,8 @@ class DB:
             return Response(ACTION_SUCCESS, "reload success")
 
         except Exception as e:
-            return Response(ACTION_FAILED, "reload failed")
+            return Response(ACTION_FAILED, "reload failed \n%s"%e)
 
-        finally:
-            self.unlock()
 
         ...
 
@@ -163,15 +159,12 @@ class DB:
     def save(self) -> Response:
         """保存数据库到本地文件
         """
-        if not self.lock:
-            self.lock()
-            with open(self.record_file, "w") as f:
-                f.write(json.dumps(self.db))
-            self.unlock()
 
-            return Response(ACTION_SUCCESS, "save success")
-        else:
-            return Response(ACTION_WARNING, "database is locked")
+        with open(self.record_file, "w") as f:
+            f.write(json.dumps(self.db))
+        self.unlock()
+
+        return Response(ACTION_SUCCESS, "save success")
 
     def add(self, k, v) -> Response:
         if not k in self.db[self.type]:
@@ -183,19 +176,16 @@ class DB:
         _code = ACTION_SUCCESS
         _msg = ""
 
-        try:
-            self.lock()
-            if self.type == "oss":
-                await self.bucket.delete_object(self.db[self.type][k])
-            else:
-                try:
-                    os.remove(self.db[self.type][k])
-                    _msg += 'file "%s" deleted,' % k
-                except:
-                    _msg += 'failed to delete file "%s",' % k
-                    _code = ACTION_FAILED
-        finally:
-            self.unlock()
+
+        if self.type == "oss":
+            await self.bucket.delete_object(self.db[self.type][k])
+        else:
+            try:
+                os.remove(self.db[self.type][k])
+                _msg += 'file "%s" deleted,' % k
+            except:
+                _msg += 'failed to delete file "%s",' % k
+                _code = ACTION_FAILED
 
         if k in self.db[self.type]:
             del self.db[self.type][k]
@@ -263,6 +253,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "test": lambda: test_aqua(bot, event),
             "reload": lambda: reload_aqua(bot, event),
             "debug": lambda: debug(bot, event),
+            "stats": lambda: stats_aqua(bot, event),
         }
         return await optdict[option]()
 
@@ -412,3 +403,9 @@ async def upload_by_reply(bot: Bot, event: Event):
         pass
     else:
         pass
+
+async def stats_aqua(bot: Bot, event: Event):
+    """统计
+    """
+    message = MessageSegment.text(f"total: {db.db_total}\navailable: {db.db_available}\n")
+    await bot.send(event, message)
