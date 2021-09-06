@@ -163,6 +163,20 @@ async def _upload_custom(
         oss2.Bucket.put_object
         ...
 
+def upload_to_local(origin: str, target: str, target_filename: str, max_size: int = 4096
+):
+    """上传文件到本地
+
+    Args :
+        >>> origin(str): 源文件地址
+        >>> targer(str): 目标路径
+        >>> target_filename(str): 目标文件名
+        >>> max_size(int): 最大文件大小, 大于的直接进行一个压缩 
+    """
+    _origin = _resize_image(file=origin, max_size=max_size, k=0.9)
+    _origin.save(target + "/" + target_filename)
+    _origin.close()
+
 
 async def _aio_upload_oss():
     ...

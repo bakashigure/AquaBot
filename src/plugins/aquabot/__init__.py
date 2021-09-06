@@ -18,7 +18,7 @@ from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 from nonebot.rule import to_me
 from nonebot.typing import T_State
-from nonebot.adapters.cqhttp import MessageSegment
+from nonebot.adapters.cqhttp import MessageSegment,escape,unescape
 
 from .config import Config, _config
 from .utils import (
@@ -64,14 +64,9 @@ class DB:
 
     def __init__(self) -> None:
         self.db = None  # 本体
-        self.db_keys = []
+        self.db_keys : list = []
         self.type = _config["storage"]  # 存储类型, 'oss' or 'local'
         self.record_file = _config["database"]  # 记录文件路径
-
-        self.db_total = 0  # 图片总数
-        self.db_available = 0  # 可用图片数
-        self.db_used = {}  # 已发送的, 等待回收
-
         self.messages = dict()  # 记录bot发送的message_id与夸图id的键值对
 
         self.__version__ = "1.0.0"
@@ -91,7 +86,7 @@ class DB:
 
         except FileNotFoundError:
             logger.warning("record file not set, will create in %s" % self.record_file)
-            init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "records":"", "version":"", "local":{}, "oss":{} }'
+            init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "records":"", "version":"", "total_count":0,"local":{}, "oss":{},"available_count":0,"available":{},"used_count":0,"used":{} }'
             with open(self.record_file, "w") as f:
                 f.write(init_content)
             self.db = json.loads(init_content)
@@ -110,42 +105,43 @@ class DB:
     def refresh(self) -> Response:
         """把发过的图片重新添加到图库
         """
-        self.db[self.type].update(self.db["used"])
+        self.db["available"].update(self.db["used"])
         self.db["used"] = {}
-        self.db_keys = self.db[self.type].keys()
-        self.db_total = len(self.db_keys)
-        self.db_available = self.db_total
+        self.db_keys = list(self.db[self.type].keys())
+        self.db["total_count"]=len(self.db_keys)
+        self.db["available_count"]=self.db["total_count"]
+        self.db["used_count"]=0
         self.last_update()
-        return Response(ACTION_SUCCESS, "refresh success, db_total:%s" % self.db_total)
+        return Response(ACTION_SUCCESS, "refresh success, db_total:%s" % self.db["total_count"])
 
     def reload(self) -> Response:
         """清空配置, 重新读取本地文件或oss.
         """
 
-        try:
-            self.lock()
-            self.db["oss"] = {}
-            self.db["local"] = {}
-            self.db["used"] = {}
+    
+        self.db["oss"] = {}
+        self.db["local"] = {}
+        self.db["used"] = {}
 
-            if self.type == "local":
-                for _, _, files in os.walk(_config["dir"]):
-                    [
-                        self.add(
-                            "file:///" + f, Path(_config["dir"]).joinpath(f).as_posix()
-                        )
-                        for f in files
-                    ]
-            else:
-                # TODO READ OSS FILE LIST
-                # OSS2.LISTOBJECTSV2
-                ...
+        if self.type == "local":
+            for _, _, files in os.walk(_config["dir"]):
+                [
+                    self.add(
+                            f, "file:///"+Path(_config["dir"]).joinpath(f).as_posix()
+                    )
+                    for f in files
+                ]
+        else:
+            # TODO READ OSS FILE LIST
+            # OSS2.LISTOBJECTSV2
+            ...
 
-            self.refresh()
-            return Response(ACTION_SUCCESS, "reload success")
+        self.db["available"]=self.db[self.type]
+        self.refresh()
+        return Response(ACTION_SUCCESS, "reload success")
 
-        except Exception as e:
-            return Response(ACTION_FAILED, "reload failed \n%s"%e)
+    #except Exception as e:
+    #    return Response(ACTION_FAILED, "reload failed \n%s"%e)
 
 
         ...
@@ -162,13 +158,12 @@ class DB:
 
         with open(self.record_file, "w") as f:
             f.write(json.dumps(self.db))
-        self.unlock()
 
         return Response(ACTION_SUCCESS, "save success")
 
     def add(self, k, v) -> Response:
         if not k in self.db[self.type]:
-            self.db_total += 1
+            self.db['total_count'] += 1
         self.db[self.type][k] = v
         return Response(ACTION_SUCCESS, "add record: %s -> %s" % (k, v))
 
@@ -202,17 +197,21 @@ class DB:
         cls.type = _type
 
     async def get_random(self) -> Response:
-        if self.db_available == 0:
+        if self.db['available_count'] == 0:
             Response(ACTION_FAILED, "no record available, will refresh records")
             self.refresh()  # 即刻触发refresh
-            if self.db_total == 0:
+            if self.db["total_count"] == 0:
                 return Response(ACTION_FAILED, "no record available")
-        choice = randint(0, self.db_total - 1)
+        choice = randint(0, self.db['available_count'] - 1)
         key = self.db_keys[choice]
-        value = self.db[self.type][key]
-        self.db_available -= 1
+        del self.db_keys[choice]
+        value = self.db["available"][key]
+
         self.db["used"][key] = value
-        del self.db[self.type][key]
+        self.db["used_count"]+=1
+
+        del self.db["available"][key]
+        self.db["available_count"] -= 1
 
         return Response(ACTION_SUCCESS, "%s" % value)
 
@@ -226,7 +225,7 @@ class DB:
 DB.set_type(_config["storage"])
 db = DB()
 
-aqua = on_command("qua", priority=5)
+aqua = on_command("aqua", priority=5)
 args = list()
 
 
@@ -254,6 +253,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "reload": lambda: reload_aqua(bot, event),
             "debug": lambda: debug(bot, event),
             "stats": lambda: stats_aqua(bot, event),
+            "save":lambda: save_aqua(bot, event),
         }
         return await optdict[option]()
 
@@ -313,7 +313,9 @@ async def delete_aqua(bot: Bot, event: Event):
 
 async def debug(bot: Bot, event: Event):
     cmd = " ".join(args[1:])
+    cmd = unescape(cmd)
     print(cmd)
+    cmd
     print(eval(cmd))
 
 
@@ -407,5 +409,9 @@ async def upload_by_reply(bot: Bot, event: Event):
 async def stats_aqua(bot: Bot, event: Event):
     """统计
     """
-    message = MessageSegment.text(f"total: {db.db_total}\navailable: {db.db_available}\n")
+    message = MessageSegment.text(f"total: {db.db['total_count']}\navailable: {db.db['available_count']}\n")
     await bot.send(event, message)
+
+
+async def save_aqua(bot: Bot, event: Event):
+    db.save()
