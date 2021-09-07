@@ -223,7 +223,7 @@ async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -
     return Response(ACTION_FAILED, msg=f"failed to get image after three attemps {_exception}")
 
 
-async def safe_get_pixiv_image(url: str, proxies=None) -> Response:
+async def get_pixiv_image(url: str, proxies=None) -> Response:
     """
     下载一张pixiv图片, 会带上pixiv请求头, 返回图片对象
 

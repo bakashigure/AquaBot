@@ -22,7 +22,12 @@ plugin_config = Config(**global_config.dict())
 _config = dict()  # 读取配置
 
 _help_url = "https://example.com"
- 
+
+
+if global_config.aqua_bot_debug.lower() == "true":
+    _config["debug"] = True
+else:
+    _config["debug"] = False
 
 _config['cqhttp'] = global_config.cqhttp
 _config['storage'] = global_config.aqua_bot_pic_storage

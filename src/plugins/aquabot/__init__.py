@@ -18,31 +18,39 @@ from nonebot.adapters import Bot, Event
 from nonebot.log import logger
 from nonebot.rule import to_me
 from nonebot.typing import T_State
-from nonebot.adapters.cqhttp import MessageSegment,escape,unescape
+from nonebot.adapters.cqhttp import MessageSegment, escape, unescape
 
 from .config import Config, _config
 from .utils import (
     get_message_image,
     get_message_text,
     get_path,
-    Response,
     ACTION_FAILED,
     ACTION_SUCCESS,
     ACTION_WARNING,
 )
 
+from .response import BaseResponse
+
 __version__ = "0.0.6"
 logger.warning("IMPORT AQUABOT")
 
-
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
-
 
 # logger.info(global_config)
 
 # logger.warning(type(global_config.aqua_bot_pic_storage))
 # logger.warning(global_config.aqua_bot_pic_storage)
+class Response(BaseResponse):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if status := self.code // 100 == 2:
+            logger.info(self.log)
+        elif status == 3:
+            logger.warning(self.log)
+        else:
+            logger.error(self.log)
 
 
 class DB:
@@ -64,7 +72,7 @@ class DB:
 
     def __init__(self) -> None:
         self.db = None  # 本体
-        self.db_keys : list = []
+        self.db_keys: list = []
         self.type = _config["storage"]  # 存储类型, 'oss' or 'local'
         self.record_file = _config["database"]  # 记录文件路径
         self.messages = dict()  # 记录bot发送的message_id与夸图id的键值对
@@ -108,9 +116,9 @@ class DB:
         self.db["available"].update(self.db["used"])
         self.db["used"] = {}
         self.db_keys = list(self.db[self.type].keys())
-        self.db["total_count"]=len(self.db_keys)
-        self.db["available_count"]=self.db["total_count"]
-        self.db["used_count"]=0
+        self.db["total_count"] = len(self.db_keys)
+        self.db["available_count"] = self.db["total_count"]
+        self.db["used_count"] = 0
         self.last_update()
         return Response(ACTION_SUCCESS, "refresh success, db_total:%s" % self.db["total_count"])
 
@@ -118,7 +126,6 @@ class DB:
         """清空配置, 重新读取本地文件或oss.
         """
 
-    
         self.db["oss"] = {}
         self.db["local"] = {}
         self.db["used"] = {}
@@ -127,7 +134,7 @@ class DB:
             for _, _, files in os.walk(_config["dir"]):
                 [
                     self.add(
-                            f, "file:///"+Path(_config["dir"]).joinpath(f).as_posix()
+                        f, Path(_config["dir"]).joinpath(f).as_posix()
                     )
                     for f in files
                 ]
@@ -136,13 +143,12 @@ class DB:
             # OSS2.LISTOBJECTSV2
             ...
 
-        self.db["available"]=self.db[self.type]
+        self.db["available"] = self.db[self.type]
         self.refresh()
         return Response(ACTION_SUCCESS, "reload success")
 
-    #except Exception as e:
+    # except Exception as e:
     #    return Response(ACTION_FAILED, "reload failed \n%s"%e)
-
 
         ...
 
@@ -170,7 +176,6 @@ class DB:
     async def delete(self, k: str) -> Response:
         _code = ACTION_SUCCESS
         _msg = ""
-
 
         if self.type == "oss":
             await self.bucket.delete_object(self.db[self.type][k])
@@ -208,11 +213,13 @@ class DB:
         value = self.db["available"][key]
 
         self.db["used"][key] = value
-        self.db["used_count"]+=1
+        self.db["used_count"] += 1
 
         del self.db["available"][key]
         self.db["available_count"] -= 1
 
+        if _config['storage']=='local':
+            value="file:///" + value
         return Response(ACTION_SUCCESS, "%s" % value)
 
     def lock(self) -> None:
@@ -253,7 +260,8 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "reload": lambda: reload_aqua(bot, event),
             "debug": lambda: debug(bot, event),
             "stats": lambda: stats_aqua(bot, event),
-            "save":lambda: save_aqua(bot, event),
+            "save": lambda: save_aqua(bot, event),
+            "func":lambda:func(bot,event)
         }
         return await optdict[option]()
 
@@ -312,11 +320,24 @@ async def delete_aqua(bot: Bot, event: Event):
 
 
 async def debug(bot: Bot, event: Event):
+    """!debug mode!
+    """
+    if not _config['debug']:
+        return await bot.send(event, MessageSegment.text("debug mode is off."))
     cmd = " ".join(args[1:])
     cmd = unescape(cmd)
     print(cmd)
-    cmd
-    print(eval(cmd))
+    await bot.send(event,str(eval(cmd)))
+
+async def func(bot:Bot,event:Event):
+    """!debug mode!
+    """
+    if not _config['debug']:
+        return await bot.send(event, MessageSegment.text("debug mode is off."))
+    cmd = " ".join(args[1:])
+    cmd = unescape(cmd)
+    print(cmd)
+    print(await eval(cmd))
 
 
 async def help_aqua(bot: Bot, event: Event):
@@ -329,7 +350,7 @@ async def search_aqua(bot: Bot, event: Event):
 
 async def pixiv_aqua(bot: Bot, event: Event):
     try:
-        _,_,_dur,_id = args
+        _, _, _dur, _id = args
     except ValueError:
         pass
 
@@ -405,6 +426,7 @@ async def upload_by_reply(bot: Bot, event: Event):
         pass
     else:
         pass
+
 
 async def stats_aqua(bot: Bot, event: Event):
     """统计
