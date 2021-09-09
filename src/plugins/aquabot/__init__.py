@@ -1,18 +1,16 @@
 import json
-import operator
 from email.utils import formatdate
 from json.decoder import JSONDecodeError
 from pathlib import Path
 from random import randint
 from threading import Lock
+from PIL import Image
 
 import nonebot
 import os
 from nonebot.adapters.cqhttp.event import MessageEvent
 import oss2
-import pixivpy3 as pixiv
 from aiofiles import open as aiofiles_open
-from httpx import AsyncClient
 from nonebot import on_command
 from nonebot.adapters import Bot, Event
 from nonebot.log import logger
@@ -20,7 +18,10 @@ from nonebot.rule import to_me
 from nonebot.typing import T_State
 from nonebot.adapters.cqhttp import MessageSegment, escape, unescape
 
+from .pixiv import pixiv_search
+
 from .config import Config, _config
+from .saucenao import saucenao_search
 from .utils import (
     get_message_image,
     get_message_text,
@@ -45,7 +46,7 @@ plugin_config = Config(**global_config.dict())
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if status := self.code // 100 == 2:
+        if status := self.status_code // 100 == 2:
             logger.info(self.log)
         elif status == 3:
             logger.warning(self.log)
@@ -125,7 +126,7 @@ class DB:
     def reload(self) -> Response:
         """清空配置, 重新读取本地文件或oss.
         """
-
+        
         self.db["oss"] = {}
         self.db["local"] = {}
         self.db["used"] = {}
@@ -147,10 +148,6 @@ class DB:
         self.refresh()
         return Response(ACTION_SUCCESS, "reload success")
 
-    # except Exception as e:
-    #    return Response(ACTION_FAILED, "reload failed \n%s"%e)
-
-        ...
 
     def last_update(self) -> Response:
         """更新'last_update'字段
@@ -175,27 +172,27 @@ class DB:
 
     async def delete(self, k: str) -> Response:
         _code = ACTION_SUCCESS
-        _msg = ""
+        _message = ""
 
         if self.type == "oss":
             await self.bucket.delete_object(self.db[self.type][k])
         else:
             try:
                 os.remove(self.db[self.type][k])
-                _msg += 'file "%s" deleted,' % k
+                _message += 'file "%s" deleted,' % k
             except:
-                _msg += 'failed to delete file "%s",' % k
+                _message += 'failed to delete file "%s",' % k
                 _code = ACTION_FAILED
 
         if k in self.db[self.type]:
             del self.db[self.type][k]
             logger.info('delete record "%s"' % k)
-            _msg += 'record "%s" deleted,' % k
+            _message += 'record "%s" deleted,' % k
         else:
             logger.warning('record "%s" not found' % k)
-            _msg += 'record "%s" not found,' % k
+            _message += 'record "%s" not found,' % k
 
-        return Response(_code, _msg)
+        return Response(_code, _message)
 
     @classmethod
     def set_type(cls, _type) -> None:
@@ -222,11 +219,6 @@ class DB:
             value="file:///" + value
         return Response(ACTION_SUCCESS, "%s" % value)
 
-    def lock(self) -> None:
-        self._lock = True
-
-    def unlock(self) -> None:
-        self._lock = False
 
 
 DB.set_type(_config["storage"])
@@ -254,6 +246,7 @@ async def handle_first_receive(bot: Bot, event: Event, state: T_State):
             "random": lambda: random_aqua(bot, event),
             "upload": lambda: upload_aqua(bot, event),
             "delete": lambda: delete_aqua(bot, event),
+            "search": lambda: search_aqua(bot, event),
             "help": lambda: help_aqua(bot, event),
             "pixiv": lambda: pixiv_aqua(bot, event),
             "test": lambda: test_aqua(bot, event),
@@ -286,8 +279,8 @@ async def random_aqua(bot: Bot, event: Event):
     """
     res = await db.get_random()
     if res.code // 100 == 2:
-        _msg = MessageSegment.image(res.msg)
-        await bot.send(event, _msg)
+        _message = MessageSegment.image(res.message)
+        await bot.send(event, _message)
     else:
         await bot.send(event, MessageSegment.text("no available images!"))
 
@@ -299,15 +292,37 @@ async def upload_aqua(bot: Bot, event: Event):
         # logger.warning(args)
         # logger.warning(event.json())
 
-        c = await get_message_image(
-            data=event.json(), type="file", path=_config["cqhttp"]
-        )
+        images = await get_message_image(data=event.json(), type="file",)
+        logger.warning(images)
+        for image in images:
+            res = await saucenao_search(image)
+            if res.status_code // 100 == 2 and res.content['index']=="pixiv":
+                _id = "pixiv_"+res.content['illust_id']
+            else:
+                pass
+        pass
+    else:
+        pass
+
+async def upload_by_reply(bot: Bot, event: Event):
+    """上传图片
+    """
+    if _config["storage"] == "local":
+        # logger.warning(args)
+        # logger.warning(event.json())
+
+        c = await get_message_image(data=event.json(), type="file")
         logger.warning(c)
 
         pass
     else:
         pass
 
+async def upload_by_pid(pid):
+    ...
+
+async def upload_by_image(path:str,user_id):
+    ...
 
 async def delete_aqua(bot: Bot, event: Event):
     """删除一张夸图
@@ -315,7 +330,7 @@ async def delete_aqua(bot: Bot, event: Event):
     print(event.json)
     print(event)
     res = await db.delete(args[1])
-    answer = MessageSegment.reply(event.message_id) + MessageSegment.text(res.msg)
+    answer = MessageSegment.reply(event.message_id) + MessageSegment.text(res.message)
     await bot.send(event, answer)
 
 
@@ -344,56 +359,29 @@ async def help_aqua(bot: Bot, event: Event):
     ...
 
 
-async def search_aqua(bot: Bot, event: Event):
-    ...
 
 
 async def pixiv_aqua(bot: Bot, event: Event):
-    try:
-        _, _, _dur, _id = args
-    except ValueError:
-        pass
+    
+    _, dur, index = args
 
-    api = pixiv.AppPixivAPI()
-    api.set_accept_language("en_us")
-    _duration = {
-        "day": "within_last_day",
-        "week": "within_last_week",
-        "month": "within_last_month",
-    }
 
-    try:
-        api.auth(refresh_token=_config["refresh_token"])
-    except Exception as e:
-        logger.error(e)
+    _REQUESTS_KWARGS = {
+        'proxies': {
+            'https': 'http://127.0.0.1:7890',
+        }, }
+    res = await pixiv_search(refresh_token=_config['refresh_token'],word='湊あくあ',search_target='exact_match_for_tags',sort='popular_desc',duration=dur,index=index,_REQUESTS_KWARGS=_REQUESTS_KWARGS,proxy="http://127.0.0.1:7890")
+    if res.status_code // 100 == 2:
+        info,image=res.content
+        image=Image.open(image)
+        _text = f"title: {info['title']}\nillust_id: {info['id']}\n♡: {info['bookmark']}"
+        _message = MessageSegment.text(_text)
+        #+MessageSegment.image(image)
+        await bot.send(event,_message)
+        await bot.send(event,image)
+    else:
+        await bot.send(event,MessageSegment.text(res.message))
 
-    if args[1] not in ["day", "week", "month"]:
-        logger.error("参数错误, 详见/aqua help pixiv")
-        # todo
-
-    res_json = api.search_illust(
-        word="湊あくあ",
-        search_target="exact_match_for_tags",
-        sort="date_asc",
-        duration=_duration[args[1]],
-    )
-
-    illust_list = []
-    for illust in res_json.illusts:
-        __dict = {
-            "title": illust.title,
-            "id": illust.id,
-            "bookmark": int(illust.total_bookmarks),
-            "large_url": illust.image_urls["large"],
-        }
-        illust_list.append(__dict)
-
-    illust_list = sorted(illust_list, key=operator.itemgetter("bookmark"))[::-1]
-
-    _id = args[3]
-    async with AsyncClient() as client:
-        headers = {"Referer": "https://www.pixiv.net/"}
-        r = client.get(illust_list[_id])
 
 
 async def test_aqua(bot: Bot, event: Event):
@@ -413,19 +401,6 @@ async def reload_aqua(bot: Bot, event: Event):
     MessageSegment.reply()
 
 
-async def upload_by_reply(bot: Bot, event: Event):
-    """上传图片
-    """
-    if _config["storage"] == "local":
-        # logger.warning(args)
-        # logger.warning(event.json())
-
-        c = await get_message_image(data=event.json(), type="file", path=_config["cqhttp"])
-        logger.warning(c)
-
-        pass
-    else:
-        pass
 
 
 async def stats_aqua(bot: Bot, event: Event):
@@ -437,3 +412,18 @@ async def stats_aqua(bot: Bot, event: Event):
 
 async def save_aqua(bot: Bot, event: Event):
     db.save()
+
+async def search_aqua(bot:Bot,event:Event):
+    """saucenao search module
+    """
+    images = await get_message_image(data=event.json(), type="file")
+    for image in images:
+        res =await saucenao_search(file_path=image,APIKEY=_config['saucenao_api'],proxies="http://127.0.0.1:7890")
+        if res.status_code // 100 == 2:
+            _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'][res.content['index']].items()])
+
+            await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.content))
+        else:
+            await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
+        
+

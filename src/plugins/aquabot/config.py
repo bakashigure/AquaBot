@@ -101,7 +101,7 @@ if not _config['refresh_token']:
     _config['pixiv'] = False
 
 # saucenao api 相关
-_config['saucenao_api'] = global_config.AQUA_BOT_SAUCENAO_API
+_config['saucenao_api'] = global_config.aqua_bot_saucenao_api
 _config['saucenao'] = True
 if not _config['saucenao_api']:
     logger.warning("没有设置saucenao api, 搜图相关功能将不可用")

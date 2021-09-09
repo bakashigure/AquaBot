@@ -10,41 +10,28 @@ from typing import Literal
 import nonebot
 from nonebot import logger
 from PIL import Image
+from nonebot.adapters.cqhttp import message
 import oss2
 import httpx
 from .config import _config
 from time import time
 from os.path import getsize as _getsize
+from .response import *
 
 logger.warning("IMPORT UTILS")
 __version__ = "0.0.1"
 
 global_config = nonebot.get_driver().config
 
-ACTION_SUCCESS = 200
-ACTION_WARNING = 300
-ACTION_FAILED = 400
-
-class Response:
-    """自定义返回 
-
-    >>> code(int): 状态码
-    >>> msg(str): 返回信息
-    >>> content(any): 返回内容
-    """
-
-    def __init__(self, code, msg=None, content=None) -> None:
-        self.code = code
-        self.msg = msg
-        self.content = content
-
-        log = f"{self.code} | {self.msg}"
-        if self.code // 100 == 2:
-            logger.info(log)
-        elif self.code // 100 == 3:
-            logger.warning(log)
-        elif self.code // 100 == 4:
-            logger.error(log)
+class Response(BaseResponse):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if status := self.status_code // 100 == 2:
+            logger.info(self.log)
+        elif status == 3:
+            logger.warning(self.log)
+        else:
+            logger.error(self.log)
 
 
 def _get_bot(bot_id):
@@ -82,15 +69,15 @@ async def get_message_image(data: str, type: Literal["file", "url"]) -> list:
     path = global_config.cqhttp
     _data = json.loads(data)
     bot = _get_bot(_data["self_id"])
-    for msg in _data["message"]:
-        if msg["type"] == "image":
+    for message in _data["message"]:
+        if message["type"] == "image":
             if type == "file":
-                _file_detail = await bot.get_image(file=msg["data"][type])
+                _file_detail = await bot.get_image(file=message["data"][type])
                 _path = path + "/" + str(_file_detail["file"])
                 # TODO add linux file system
                 _img_list.append(_path)
             else:
-                _img_list.append(msg["data"][type])
+                _img_list.append(message["data"][type])
 
     return _img_list
 
@@ -106,7 +93,7 @@ def _clear_cache():
     ...
 
 
-def _resize_image(file: str, max_size: int, k: float) -> Image.Image:
+def _resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     """接受一个图片, 将其转换为jpg, 大小不超过max_size,
     过程中产生的临时文件存储于_config['cache']下
 
@@ -119,7 +106,7 @@ def _resize_image(file: str, max_size: int, k: float) -> Image.Image:
         >>> image(Image.Image): 处理后的图片对象
     """
     _max_size = max_size * 1024  # convert KB to Bytes
-    im = Image.open(file)
+    im = Image.open(origin)
     (x, y) = im.size
     if im.format == "gif":
         return im
@@ -163,8 +150,7 @@ async def _upload_custom(
         oss2.Bucket.put_object
         ...
 
-def upload_to_local(origin: str, target: str, target_filename: str, max_size: int = 4096
-):
+def upload_to_local(origin: str, target: str, target_filename: str, max_size: int = 4096):
     """上传文件到本地
 
     Args :
@@ -207,20 +193,19 @@ async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -
         >>> headers(dict): 请求头
         >>> proxies(str): 代理
     Returns :
+        >>> Response.status_code(int): 请求的状态码
         >>> Response.content(Image.Image): 图片
-        >>> Response.msg(str): 请求失败的原因
-        >>> Response.code(int): 请求的状态码
+        >>> Response.message(str): 请求失败的原因
     """
-    _exception = None
-    # try 3 times
-    for i in range(3):
-        try:
-            async with httpx.AsyncClient(proxies=proxies) as client:
-                r = await client.get(url, headers=headers, timeout=5)
-                return Response(ACTION_SUCCESS, content=Image.open(BytesIO(r.content)))
-        except Exception as e:
-            _exception = e
-    return Response(ACTION_FAILED, msg=f"failed to get image after three attemps {_exception}")
+    try:
+        async with httpx.AsyncClient(proxies=proxies) as client:
+            res = await client.get(url, headers=headers, timeout=5)
+            res.raise_for_status()
+    except httpx.ProxyError as exc:
+        return Response(ACTION_FAILED,message="httpx proxy error.")
+    except httpx.HTTPStatusError as exc:
+        return Response(ACTION_FAILED,message=f"Error response {exc.response.status_code} while requesting {exc.request.url!r}.")
+    return Response(ACTION_SUCCESS, content=BytesIO(res.content))
 
 
 async def get_pixiv_image(url: str, proxies=None) -> Response:
@@ -232,9 +217,9 @@ async def get_pixiv_image(url: str, proxies=None) -> Response:
         >>> proxies(str): 代理(可选)
 
     Returns:
-        >>> Response.code(int): 请求的状态码
+        >>> Response.status_code(int): 请求的状态码
         >>> Response.content(Image.Image): 图片
-        >>> Response.msg(str): 请求失败的原因
+        >>> Response.message(str): 请求失败的原因
     """
     headers = {"Referer": "https://www.pixiv.net/"}
     return await _safe_get_image(url, headers=headers, proxies=proxies)
