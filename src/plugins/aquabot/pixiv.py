@@ -49,7 +49,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:str, sort:str,
     duration = "within_last_" + duration
     res_json = api.search_illust(word, search_target, sort, duration)
     illust_list = sorted([{"title": illust.title, "id": illust.id, "bookmark": int(illust.total_bookmarks), "large_url": illust.image_urls["large"]} for illust in res_json.illusts],key=operator.itemgetter("bookmark"),reverse=True)
-    if index > len(illust_list):
+    if index > len(illust_list) or index < 1:
         return Response(ACTION_FAILED, f"Index out of range({len(illust_list)})", )
     
     res = await get_pixiv_image(illust_list[index-1]["large_url"],proxies=proxy)
