@@ -81,7 +81,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxies=None)->Response:
 
         if int(results['header']['results_returned']) > 0:
             artwork_url = ""
-            print(results)
+            #print(results)
             rate = results['results'][0]['header']['similarity']+'%'
             # one or more results were returned
             if float(results['results'][0]['header']['similarity']) > float(results['header']['minimum_similarity']):

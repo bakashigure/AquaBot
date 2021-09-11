@@ -110,7 +110,7 @@ def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     if im.format == "gif":
         return im
     else:
-        tmp_fp = (lambda: _config['cache'] + "/" + str(time.time()).replace(".", "") + ".jpg")
+        tmp_fp = (lambda: _config['cache'] + "/" + str(time()).replace(".", "") + ".jpg")
         _tmp = tmp_fp()
         im.save(_tmp)
 
@@ -156,18 +156,25 @@ def upload_to_local(origin: str, target: str, target_filename: str, max_size: in
         * `` target_filename: str`` : 目标文件名
         * `` max_size: int`` : 最大文件大小, 大于的直接进行一个压缩 
     """
-    try:
-        _origin = resize_image(file=origin, max_size=max_size, k=0.5)
-        _format = 'gif' if _origin.format == 'gif' else 'jpg'
-        _target_full_path = target+'/'+target_filename+_format
-        _target_with_format = target_filename+'.'+_format
-        _origin.save(_target_full_path,format=_format)
-        _origin.close()
+    #try:
+    _origin = resize_image(origin, max_size, 0.5)
+    _format = 'gif' if _origin.format == 'gif' else 'jpeg'
+    target=str(target)
+    logger.warning(f"target type: {type(target)}")
+    logger.warning(f"target_filename type: {type(target_filename)}")
+
+    _target_with_path_format = target+'/'+target_filename+'.'+_format
+    _target_with_path = target+'/'+target_filename
+    _target_with_format = target_filename+'.'+_format
+    _origin.save(_target_with_path_format,format=_format)
+    _origin.close()
+    '''
     except Exception as e:
         logger.error(e)
-        return Response(ACTION_FAILED, msg=f"上传失败, {e}")
-    logger.info(f"上传成功, {_target_full_path}")
-    return Response(ACTION_SUCCESS, content=(_target_with_format,_target_full_path))
+        return Response(ACTION_FAILED, message=f"上传失败, {e}")
+    '''
+    logger.info(f"上传成功, {_target_with_format}")
+    return Response(ACTION_SUCCESS, content=(_target_with_format,_target_with_path_format))
 
 
 async def _aio_upload_oss():
