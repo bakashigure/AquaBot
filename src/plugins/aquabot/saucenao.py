@@ -159,6 +159,13 @@ async def saucenao_search(file_path: str, APIKEY: str, proxies=None)->Response:
                     characters = results['results'][0]['data']['characters']
                     source = results['results'][0]['data']['source']
                     found_json['data']['yandere'] = {"creator": creator, "characters": characters, "source": source}
+                elif index_id == 41:
+                    # 41->twitter
+                    found_json['index'] = "twitter"
+                    url = results['results'][0]['data']['ext_urls']
+                    date = results['results'][0]['data']['created_at']
+                    creator = results['results'][0]['data']['twitter_user_handle']
+                    found_json['data']['twitter']={"url": url, "date": date, "creator": creator}
 
                 else:
                     # unknown

@@ -7,7 +7,7 @@ from .response import *
 Response=BaseResponse
 
 async def pixiv_search(refresh_token:str, word:str, search_target:str, sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None)->Response:
-    """对指定关键词搜索, 施加限定条件, 返回图片
+    """对指定关键词搜索, 施加限定条件, 返回图片, 详见pixivpy3.search_illust
 
     Args:
     >>> refresh_token(str): pixiv登陆token
@@ -23,7 +23,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:str, sort:str,
         'proxies': {
             'https': 'http://127.0.0.1:7890',
         }, }
-
+  
 
     Returns:
     >>> Response.status_code(int): 状态码
@@ -41,8 +41,11 @@ async def pixiv_search(refresh_token:str, word:str, search_target:str, sort:str,
 
     if duration not in ["day", "week", "month"]:    
         return Response(ACTION_FAILED, "Invalid duration")
-    
-    index=int(index)
+    try:
+        index=int(index)
+    except ValueError:
+        return Response(ACTION_FAILED, "Invalid index")
+        
     duration = "within_last_" + duration
     res_json = api.search_illust(word, search_target, sort, duration)
     illust_list = sorted([{"title": illust.title, "id": illust.id, "bookmark": int(illust.total_bookmarks), "large_url": illust.image_urls["large"]} for illust in res_json.illusts],key=operator.itemgetter("bookmark"),reverse=True)

@@ -1,37 +1,32 @@
 import json
 from email.utils import formatdate
 from json.decoder import JSONDecodeError
+from os import remove as os_remove
+from os import walk as os_walk
+from os.path import getsize as os_getsize
 from pathlib import Path
 from random import randint
 from threading import Lock
-from PIL import Image
 
 import nonebot
-import os
-from nonebot.adapters.cqhttp.event import MessageEvent
-import oss2
+#import oss2
 from aiofiles import open as aiofiles_open
 from nonebot import on_command
 from nonebot.adapters import Bot, Event
+from nonebot.adapters.cqhttp import MessageSegment, escape, unescape
+from nonebot.adapters.cqhttp.event import MessageEvent
 from nonebot.log import logger
 from nonebot.rule import to_me
 from nonebot.typing import T_State
-from nonebot.adapters.cqhttp import MessageSegment, escape, unescape
-
-from .pixiv import pixiv_search
+from PIL import Image
 
 from .config import Config, _config
-from .saucenao import saucenao_search
-from .utils import (
-    get_message_image,
-    get_message_text,
-    get_path,
-    ACTION_FAILED,
-    ACTION_SUCCESS,
-    ACTION_WARNING,
-)
-
+from .pixiv import pixiv_search
 from .response import BaseResponse
+from .saucenao import saucenao_search
+from .utils import (ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING,
+                    get_message_image, get_message_text, get_path,upload_to_local)
+from .utils import record_id as _record_id
 
 __version__ = "0.0.6"
 logger.warning("IMPORT AQUABOT")
@@ -80,12 +75,13 @@ class DB:
 
         self.__version__ = "1.0.0"
 
+        '''
         if self.type == "oss":
             self.auth = oss2.Auth(
                 _config["access_key_id"], _config["access_key_secret"]
             )
             self.bucket = oss2.Bucket(self.auth, _config["endpoint"], _config["bucket"])
-
+        '''
         # 从配置文件中读取夸图数据库, 避免读取本地文件或者oss造成缓慢性能
         # 如果配置文件不存在则生成一个
         try:
@@ -132,9 +128,9 @@ class DB:
         self.db["used"] = {}
 
         if self.type == "local":
-            for _, _, files in os.walk(_config["dir"]):
+            for _, _, files in os_walk(_config["dir"]):
                 [
-                    self.add(
+                    self.add_record(
                         f, Path(_config["dir"]).joinpath(f).as_posix()
                     )
                     for f in files
@@ -164,11 +160,19 @@ class DB:
 
         return Response(ACTION_SUCCESS, "save success")
 
-    def add(self, k, v) -> Response:
+    async def upload(self,*args,**kwargs):
+        """添加一个夸图到数据库
+
+        :origin: 夸图原图路径
+        """
+        if self.type == "local":
+            return upload_to_local(*args,**kwargs)
+
+    def add_record(self, k, v) -> Response:
         if not k in self.db[self.type]:
             self.db['total_count'] += 1
         self.db[self.type][k] = v
-        return Response(ACTION_SUCCESS, "add record: %s -> %s" % (k, v))
+        return Response(ACTION_SUCCESS, "add_record record: %s -> %s" % (k, v))
 
     async def delete(self, k: str) -> Response:
         _code = ACTION_SUCCESS
@@ -178,7 +182,7 @@ class DB:
             await self.bucket.delete_object(self.db[self.type][k])
         else:
             try:
-                os.remove(self.db[self.type][k])
+                os_remove(self.db[self.type][k])
                 _message += 'file "%s" deleted,' % k
             except:
                 _message += 'failed to delete file "%s",' % k
@@ -197,6 +201,9 @@ class DB:
     @classmethod
     def set_type(cls, _type) -> None:
         cls.type = _type
+
+    def exist(self,k)->bool:
+        return k in self.db[self.type]
 
     async def get_random(self) -> Response:
         if self.db['available_count'] == 0:
@@ -217,16 +224,21 @@ class DB:
 
         if _config['storage']=='local':
             value="file:///" + value
-        return Response(ACTION_SUCCESS, "%s" % value)
+        return Response(ACTION_SUCCESS, content=(key,f"{value}"))
 
 
 
 DB.set_type(_config["storage"])
 db = DB()
 
+
+
 aqua = on_command("aqua", priority=5)
 args = list()
 
+def record_id(k,v):
+    return _record_id(db.messages, k, v)
+    
 
 async def misc():
     """定时脚本
@@ -278,9 +290,10 @@ async def random_aqua(bot: Bot, event: Event):
     Returns:
     """
     res = await db.get_random()
-    if res.code // 100 == 2:
-        _message = MessageSegment.image(res.message)
-        await bot.send(event, _message)
+    if res.status_code // 100 == 2:
+        key,image = res.content
+        id = await bot.send(event, MessageSegment.image(image))
+        record_id(id,key)
     else:
         await bot.send(event, MessageSegment.text("no available images!"))
 
@@ -292,12 +305,21 @@ async def upload_aqua(bot: Bot, event: Event):
         # logger.warning(args)
         # logger.warning(event.json())
 
+        _response = Response(ACTION_SUCCESS)
         images = await get_message_image(data=event.json(), type="file",)
         logger.warning(images)
         for image in images:
-            res = await saucenao_search(image)
+            res = await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
             if res.status_code // 100 == 2 and res.content['index']=="pixiv":
                 _id = "pixiv_"+res.content['illust_id']
+                _response.content=f"Found source in pixiv, illust_id: {res.content['illust_id']}\n"
+                if db.exist(_id):
+                    _response.content += f"{_id} already exists."
+                else:
+                    # TODO UPLOAD
+                    _id = event.message_id+"_"+str(randint(0,1000000))
+                    _response.content += f"{_id} uploaded."
+                
             else:
                 pass
         pass
@@ -352,7 +374,15 @@ async def func(bot:Bot,event:Event):
     cmd = " ".join(args[1:])
     cmd = unescape(cmd)
     print(cmd)
-    print(await eval(cmd))
+    _res = await eval(cmd)
+    print(type(_res))
+    if isinstance(_res,BaseResponse):
+        if _res.status_code//100==2:
+            await bot.send(event,MessageSegment.text(str(_res.content)))
+        else:
+            await bot.send(event,MessageSegment.text(_res.message))
+    else:
+        await bot.send(event,MessageSegment.text(_res))
 
 
 async def help_aqua(bot: Bot, event: Event):
@@ -362,21 +392,26 @@ async def help_aqua(bot: Bot, event: Event):
 
 
 async def pixiv_aqua(bot: Bot, event: Event):
-    
-    _, dur, index = args
-
+    logger.warning(args)
+    logger.warning(len(args))
+    if len(args)==3:
+        _,dur,index =args
+        word="湊あくあ"
+    elif len(args)==4:
+        _,word,dur,index = args
+    else:
+        return await bot.send(event, MessageSegment.text("参 数 错 误"))
 
     _REQUESTS_KWARGS = {
         'proxies': {
             'https': 'http://127.0.0.1:7890',
         }, }
-    res = await pixiv_search(refresh_token=_config['refresh_token'],word='湊あくあ',search_target='exact_match_for_tags',sort='popular_desc',duration=dur,index=index,_REQUESTS_KWARGS=_REQUESTS_KWARGS,proxy="http://127.0.0.1:7890")
+    res = await pixiv_search(refresh_token=_config['refresh_token'],word=word,search_target='partial_match_for_tags',sort='popular_desc',duration=dur,index=index,_REQUESTS_KWARGS=_REQUESTS_KWARGS,proxy="http://127.0.0.1:7890")
     if res.status_code // 100 == 2:
         info,image=res.content
-        image=Image.open(image)
-        _text = f"title: {info['title']}\nillust_id: {info['id']}\n♡: {info['bookmark']}"
-        _message = MessageSegment.text(_text)
-        #+MessageSegment.image(image)
+        image=MessageSegment.image(image)
+        _text = f"title: {info['title']}\n♡: {info['bookmark']}\npid: {info['id']}"
+        _message = MessageSegment.text(_text)   + image
         await bot.send(event,_message)
         await bot.send(event,image)
     else:
@@ -388,9 +423,11 @@ async def test_aqua(bot: Bot, event: Event):
     await bot.send(event=event, message="i got test")
 
 
-async def more_aqua():
-    ...
-
+async def more_aqua(bot:Bot,event:Event):
+    for _ in range(randint(1,4)):
+        key,image=await db.get_random().content
+        id = await bot.send(event,MessageSegment.image(image))
+        record_id(id,key)
 
 async def one_aqua(bot: Bot, event: Event):
     return await random_aqua(bot, event)
@@ -417,12 +454,14 @@ async def search_aqua(bot:Bot,event:Event):
     """saucenao search module
     """
     images = await get_message_image(data=event.json(), type="file")
+    if len(images) == 0:
+        await bot.send(event, MessageSegment.reply(event.message_id)+MessageSegment.text("给点图?"))
     for image in images:
         res =await saucenao_search(file_path=image,APIKEY=_config['saucenao_api'],proxies="http://127.0.0.1:7890")
         if res.status_code // 100 == 2:
             _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'][res.content['index']].items()])
 
-            await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.content))
+            await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
         else:
             await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
         

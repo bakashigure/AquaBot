@@ -23,7 +23,7 @@ driver.register_adapter("cqhttp", CQHTTPBot)
 
 nonebot.load_builtin_plugins()
 #nonebot.load_plugin("src.plugins.aquabot.uu")
-nonebot.load_plugin("nonebot_plugin_test")
+#nonebot.load_plugin("nonebot_plugin_test")
 nonebot.load_plugin("src.plugins.aquabot")
 
 #nonebot.load_from_toml(".pyproject.toml")
