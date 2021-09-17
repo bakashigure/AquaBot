@@ -32,7 +32,7 @@ text['chinese']['warning_pixiv_token_not_set']="没有设置pixiv refresh token,
 text['chinese']['warning_saucenao_api_not_set']="没有设置saucenao api, 搜图相关功能将不可使用"
 text['chinese']['warning_language_not_exist']="语言设置不正确, 请检查.env文件"
 
-text['chinese']['help']='''AquaBot v2.0.0
+text['chinese']['help']='''AquaBot v2.0.1
 aqua random - 一张随机夸图, 或大喊'夸图来','来点夸图',或戳一戳bot\n\
             - 回复这张图'id'来获得其id\n\
 aqua more - 查看更多夸图, 或大喊'多来点夸图'\n\

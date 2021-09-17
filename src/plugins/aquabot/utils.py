@@ -19,7 +19,6 @@ from os.path import getsize
 from .response import *
 
 logger.warning("IMPORT UTILS")
-__version__ = "0.0.1"
 
 global_config = nonebot.get_driver().config
 
@@ -52,7 +51,7 @@ def _get_bot(bot_id):
         logger.error("bot'%s'未连接" % bot_id)
 
 
-async def get_message_image(data: str, type: Literal["file", "url"]) -> list:
+async def get_message_image(data, type: Literal["file", "url"]) -> list:
     """
     返回一个包含消息中所有图片文件路径的list, 
 
@@ -65,8 +64,11 @@ async def get_message_image(data: str, type: Literal["file", "url"]) -> list:
     """
     _img_list = []
     path = global_config.cqhttp
-    _data = json.loads(data)
-    bot = _get_bot(_data["self_id"])
+    if isinstance(data,str):
+        _data = json.loads(data)
+    else:
+        _data = data
+    bot = nonebot.get_bot()
     for message in _data["message"]:
         if message["type"] == "image":
             if type == "file":
@@ -197,46 +199,7 @@ def get_path(path):
     return Path(path).resolve()
 
 
-async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -> Response:
-    """
-    下载图片, 并返回图片对象
 
-    Args :
-        * ``url: str``: 图片url
-        * `` headers: dict``: 请求头
-        * `` proxies: str``: 代理
-
-    Returns :
-        * `` Response.status_code: int`` : 请求的状态码
-        * `` Response.content: Image.Image`` : 图片
-        * `` Response.message: str`` : 请求失败的原因
-    """
-    try:
-        async with httpx.AsyncClient(proxies=proxies) as client:
-            res = await client.get(url, headers=headers, timeout=5)
-            res.raise_for_status()
-    except httpx.ProxyError as exc:
-        return Response(ACTION_FAILED,message="httpx proxy error.")
-    except httpx.HTTPStatusError as exc:
-        return Response(ACTION_FAILED,message=f"Error response {exc.response.status_code} while requesting {exc.request.url!r}.")
-    return Response(ACTION_SUCCESS, content=BytesIO(res.content))
-
-
-async def get_pixiv_image(url: str, proxies=None) -> Response:
-    """
-    下载一张pixiv图片, 会带上pixiv请求头, 返回图片对象
-
-    Args :
-        * `` url: str`` : 图片url
-        * `` proxies: str`` : 代理(可选)
-
-    Returns:
-        * `` Response.status_code: int`` : 请求的状态码
-        * `` Response.content: Image.Image`` : 图片
-        * `` Response.message: str`` : 请求失败的原因
-    """
-    headers = {"Referer": "https://www.pixiv.net/"}
-    return await _safe_get_image(url, headers=headers, proxies=proxies)
 
 def record_id(d:dict,k:Union[dict,str],v:Any):
     if isinstance(k,dict):

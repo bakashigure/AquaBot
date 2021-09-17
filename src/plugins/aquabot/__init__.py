@@ -23,7 +23,7 @@ from nonebot.typing import T_State
 from PIL import Image
 
 from .config import Config, _config
-from .pixiv import pixiv_search
+from .pixiv import get_pixiv_image_by_pid, pixiv_search,get_pixiv_image
 from .response import BaseResponse
 from .saucenao import saucenao_search
 from .utils import (ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING,
@@ -31,7 +31,7 @@ from .utils import (ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING,
 from .utils import record_id as _record_id
 from .text import text as _text
 
-__version__ = "0.0.6"
+__version__ = "2.0.1"
 logger.warning("IMPORT AQUABOT")
 
 global_config = nonebot.get_driver().config
@@ -304,6 +304,11 @@ async def random_aqua(bot: Bot, event: Event):
 async def upload_aqua(bot: Bot, event: Event):
     """上传一张图片
     """
+    _REQUESTS_KWARGS = {
+        'proxies': {
+            'https': 'http://127.0.0.1:7890',
+        }, }
+
     #await bot.send(event,str(event.json()))
     if _config["storage"] == "local":
         # logger.warning(args)
@@ -312,33 +317,44 @@ async def upload_aqua(bot: Bot, event: Event):
         _response = Response(ACTION_SUCCESS,content='')
         images = await get_message_image(data=event.json(), type="file")
         if len(images)==0:
-            return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text("给点图?"))
-        _user_id = str(event.user_id)[:4]
-        logger.warning(images)
-        for image in images:
-            res = await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
+            images = args[1:]
+            if len(images)==0:
+                return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text("给点图?"))
+            for image in images:
+                try:
+                    int(image)
+                except:
+                    return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(f"pid必须为纯数字 -> {image}"))
+            for pid in images:
+                res,image = (await get_pixiv_image_by_pid(pid,_config['refresh_token'],_REQUESTS_KWARGS,"http://127.0.0.1:7890")).content
+                await bot.send(event,MessageSegment.text("\n".join([f"{k}: {v}" for k,v in res.items()])))
+                await bot.send(event,MessageSegment.image(image))
+        else:
+            _user_id = str(event.user_id)[:4] # 取用户qq前四位用作随机图片名上半段
+            logger.warning(images)
+            for image in images:
+                res = await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
 
-            if res.status_code // 100 == 2:
-                if res.content['index']=="pixiv":
-                    logger.warning(res.content)
-                    _id = "pixiv_"+res.content['data']['pixiv']['illust_id'].__str__()
-                    _id_with_format = _id+'.jpeg'
-                    _response.content=f"发现pixiv原图, illust_id: {res.content['data']['pixiv']['illust_id'].__str__()}\n"
-                    if db.exist(_id_with_format):
-                        _response.content += f"{_id_with_format} 已经传过了."
-                        return await bot.send(event, MessageSegment.text(_response.content))
-                    else:
-                        await db.upload(image,_config['dir'],_id)
-                        _response.content += f"{_id_with_format} 上传成功."
-                        return await bot.send(event, MessageSegment.text(_response.content))
-            else:
-                _id = _user_id+"_"+str(randint(0,10000000))
-                _id_with_format,_ = (await db.upload(image,_config['dir'],_id)).content
-                _response.content += f"{_id_with_format} uploaded."
-                return await bot.send(event, MessageSegment.text(_response.content))
+                if res.status_code // 100 == 2:
+                    if res.content['index']=="pixiv":
+                        logger.warning(res.content)
+                        _id = "pixiv_"+res.content['data']['pixiv']['illust_id'].__str__()
+                        _id_with_format = _id+'.jpeg'
+                        _response.content=f"发现pixiv原图, illust_id: {res.content['data']['pixiv']['illust_id'].__str__()}\n"
+                        if db.exist(_id_with_format):
+                            _response.content += f"{_id_with_format} 已经传过了."
+                            return await bot.send(event, MessageSegment.text(_response.content))
+                        else:
+                            await db.upload(image,_config['dir'],_id)
+                            _response.content += f"{_id_with_format} 上传成功."
+                            return await bot.send(event, MessageSegment.text(_response.content))
+                else:
+                    _id = _user_id+"_"+str(randint(0,10000000)) #随便搞点随机数用作用户上传图片名下半段
+                    _id_with_format,_ = (await db.upload(image,_config['dir'],_id)).content
+                    _response.content += f"{_id_with_format} 上传成功."
+                    return await bot.send(event, MessageSegment.text(_response.content))
             
-    else:
-        pass
+
 
 async def upload_by_reply(bot: Bot, event: Event):
     """通过回复上传图片
@@ -346,8 +362,10 @@ async def upload_by_reply(bot: Bot, event: Event):
     # TODO 
     pass
 
-async def upload_by_pid(pid):
-    ...
+async def upload_by_pid(pid,refresh_token,_REQUESTS_KWARGS=None,proxies=None)->Response:
+    
+    return res
+    
 
 async def upload_by_image(path:str,user_id):
     ...
@@ -454,8 +472,21 @@ async def _(bot: Bot, event: GroupMessageEvent):
     if r:
         if event.self_id == event.reply.sender.user_id:
             await bot.send(event,MessageSegment.reply(event.user_id)+MessageSegment.text(db.get_picture_id(event.reply.message_id)))
+        else:
+            if (event.get_plaintext() in ["搜","aquasearch","aqua search","search"]):
+                msg = await bot.get_msg(message_id=event.reply.message_id)
+                logger.warning(msg)
+                logger.warning(type(msg))
+                images = await get_message_image(msg,type='file')
 
+                for image in images:
+                    res =await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
+                    if res.status_code // 100 == 2:
+                        _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
 
+                        await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
+                    else:
+                        await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
 
 
 poke_aqua=on_notice()
@@ -484,12 +515,14 @@ async def search_aqua(bot:Bot,event:Event):
     if len(images) == 0:
         await bot.send(event, MessageSegment.reply(event.message_id)+MessageSegment.text("给点图?"))
     for image in images:
-        res =await saucenao_search(file_path=image,APIKEY=_config['saucenao_api'],proxies="http://127.0.0.1:7890")
+        res =await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
         if res.status_code // 100 == 2:
-            _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'][res.content['index']].items()])
+            _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
 
             await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
         else:
             await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
+
+
         
 
