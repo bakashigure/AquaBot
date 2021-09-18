@@ -92,6 +92,8 @@ def get_message_text(data: str) -> str:
 def _clear_cache():
     ...
 
+def _tmp_fp()->str:
+    return _config['cache'] + "/" + str(time()).replace(".", "") + ".jpg"
 
 def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     """接受一个图片, 将其转换为jpg, 大小不超过max_size,
@@ -112,13 +114,12 @@ def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     if im.format == "gif":
         return im
     else:
-        tmp_fp = (lambda: _config['cache'] + "/" + str(time()).replace(".", "") + ".jpg")
-        _tmp = tmp_fp()
+        _tmp = _tmp_fp()
         im.save(_tmp)
 
         if getsize(_tmp) > _max_size:
             while True:
-                _tmp = tmp_fp()
+                _tmp = _tmp_fp()
                 (x, y) = (int(x * k), int(y * k))
                 _out = im.resize((x, y))
                 _out.save(_tmp)
@@ -149,7 +150,7 @@ async def _upload_custom(
         oss2.Bucket.put_object
         ...
 
-def upload_to_local(origin: str, target: str, target_filename: str, max_size: int = 2048)->Response:
+def upload_to_local(origin: Union[str,BytesIO], target: str, target_filename: str, max_size: int = 2048)->Response:
     """上传文件到本地
 
     Args :
@@ -159,7 +160,17 @@ def upload_to_local(origin: str, target: str, target_filename: str, max_size: in
         * `` max_size: int`` : 最大文件大小, 大于的直接进行一个压缩 
     """
     #try:
-    _origin = resize_image(origin, max_size, 0.5)
+    logger.error(type(origin))
+    if isinstance(origin, BytesIO):
+        _origin = _tmp_fp()
+        _f = open(_origin, "wb")
+        logger.warning(type(origin))
+        logger.warning(type(_f))
+        _f.write(origin.getbuffer())
+        _f.close()
+    elif isinstance(origin, str):
+        _origin = origin
+    _origin = resize_image(_origin, max_size, 0.5)
     _format = 'gif' if _origin.format == 'gif' else 'jpeg'
     target=str(target)
     logger.warning(f"target type: {type(target)}")

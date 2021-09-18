@@ -58,7 +58,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
     imageData.close()
 
     async with httpx.AsyncClient(proxies=proxy) as client:
-        r = await client.post(url=url_all, files=files, timeout=6)
+        r = await client.post(url=url_all, files=files)
         if r.status_code != 200:
             if r.status_code == 403:
                 return Response(ACTION_FAILED, message="Incorrect or Invalid API Key!")
