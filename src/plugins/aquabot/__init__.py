@@ -7,7 +7,8 @@ from os.path import getsize as os_getsize
 from pathlib import Path
 from random import randint
 from threading import Lock
-from re import search as re_search
+from re import A, search as re_search
+from asyncio import sleep as asyncio_sleep
 
 import nonebot
 #import oss2
@@ -326,21 +327,33 @@ async def upload_aqua(bot: Bot, event: Event):
                 except:
                     return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(f"pid必须为纯数字 -> {image}"))
             for pid in images:
+                asyncio_sleep(0.5)
                 res,image = (await get_pixiv_image_by_pid(pid,_config['refresh_token'],_REQUESTS_KWARGS,"http://127.0.0.1:7890")).content
                 await bot.send(event,MessageSegment.text("\n".join([f"{k}: {v}" for k,v in res.items()])))
                 await bot.send(event,MessageSegment.image(image))
+                _id = "pixiv_"+res['id'].__str__()
+                _id_with_format = _id + '.jpeg'
+                if db.exist(_id_with_format) or db.exist(_id):
+                    _response.content = "已经传过了."
+                    return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_response.content))
+                else:
+                    await db.upload(image,_config['dir'],_id)
+                    _response.content = f"{_id} 上传成功."
+                    return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_response.content))
+
         else:
             _user_id = str(event.user_id)[:4] # 取用户qq前四位用作随机图片名上半段
             logger.warning(images)
             for image in images:
+                asyncio_sleep(0.5)
                 res = await saucenao_search(image,_config['saucenao_api'],"http://127.0.0.1:7890")
 
                 if res.status_code // 100 == 2:
                     if res.content['index']=="pixiv":
                         logger.warning(res.content)
-                        _id = "pixiv_"+res.content['data']['pixiv']['illust_id'].__str__()
+                        _id = "pixiv_"+res.content['data']['illust_id'].__str__()
                         _id_with_format = _id+'.jpeg'
-                        _response.content=f"发现pixiv原图, illust_id: {res.content['data']['pixiv']['illust_id'].__str__()}\n"
+                        _response.content=f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
                         if db.exist(_id_with_format):
                             _response.content += f"{_id_with_format} 已经传过了."
                             return await bot.send(event, MessageSegment.text(_response.content))
