@@ -21,6 +21,8 @@ database.json
 # Distribution / packaging
 .Python
 build/
+cache/
+cache/*
 develop-eggs/
 dist/
 downloads/
