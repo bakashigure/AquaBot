@@ -1,3 +1,4 @@
+__version__ = "2.0.4"
 
 text = dict()
 text['english'] = dict()
@@ -32,14 +33,14 @@ text['chinese']['warning_pixiv_token_not_set']="没有设置pixiv refresh token,
 text['chinese']['warning_saucenao_api_not_set']="没有设置saucenao api, 搜图相关功能将不可使用"
 text['chinese']['warning_language_not_exist']="语言设置不正确, 请检查.env文件"
 
-text['chinese']['help']='''AquaBot v2.0.1
+text['chinese']['help']=f'''AquaBot v{__version__}
 aqua random - 一张随机夸图, 或大喊'夸图来','来点夸图',或戳一戳bot\n\
             - 回复这张图'id'来获得其id\n\
 aqua more - 查看更多夸图, 或大喊'多来点夸图'\n\
 aqua help - 您要找的是不是 'aqua help'?\n\
 aqua upload [夸图] - 上传夸图(支持多张)\n\
 aqua delete [夸图id] - 删除夸图\n\
-aqua pixiv (关键词) ['day','week','month'] [index] - 返回关键词在指定区间内最受欢迎的第index张图\n\
+aqua pixiv (关键词) ['day','week','month'] [index] ('full') - 返回关键词在指定区间内最受欢迎的第index张图, 关键词中的空格请用下划线替代\n\
 aqua search [图] - 在saucenao中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
 aqua stats - 现在有多少张夸图?\n\
 _____________________________________\n\

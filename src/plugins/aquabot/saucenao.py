@@ -57,35 +57,41 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
     files = {'file': (file_path, imageData.getvalue())}
     imageData.close()
 
+    _retry = 3
+    r = None
+
     async with httpx.AsyncClient(proxies=proxy) as client:
         r = await client.post(url=url_all, files=files)
-        if r.status_code != 200:
-            if r.status_code == 403:
-                return Response(ACTION_FAILED, message="Incorrect or Invalid API Key!")
-            else:
-                return Response(ACTION_FAILED, message="Error Code: " + str(r.status_code))
+ 
+
+    print(r)
+    if r.status_code != 200:
+        if r.status_code == 403:
+            return Response(ACTION_FAILED, message="Incorrect or Invalid API Key!")
         else:
-            results = json.JSONDecoder(object_pairs_hook=OrderedDict).decode(r.text)
-            if int(results['header']['user_id']) > 0:
-                _remain_searches = 'Remaining Searches 30s|24h: ' + str( results['header']['short_remaining']) + '|' + str(results['header']['long_remaining'])
-                print(_remain_searches)
-                if int(results['header']['status']) == 0:
-                    # search succeeded for all indexes, results usable
-                    ...
-                else:
-                    if int(results['header']['status']) > 0:
-                        # One or more indexes are having an issue.
-                        # This search is considered partially successful, even if all indexes failed, so is still counted against your limit.
-                        # The error may be transient, but because we don't want to waste searches, allow time for recovery.
-                        return Response(ACTION_FAILED, "SauceNAO error, pls try again later.")
-                    else:
-                        # Problem with search as submitted, bad image, or impossible request.
-                        # Issue is unclear, so don't flood requests.
-                        return Response(ACTION_FAILED, "Bad image or other request error. ")
+            return Response(ACTION_FAILED, message="Error Code: " + str(r.status_code))
+    else:
+        results = json.JSONDecoder(object_pairs_hook=OrderedDict).decode(r.text)
+        if int(results['header']['user_id']) > 0:
+            _remain_searches = 'Remaining Searches 30s|24h: ' + str( results['header']['short_remaining']) + '|' + str(results['header']['long_remaining'])
+            print(_remain_searches)
+            if int(results['header']['status']) == 0:
+                # search succeeded for all indexes, results usable
+                ...
             else:
-                # General issue, api did not respond. Normal site took over for this error state.
-                # Issue is unclear, so don't flood requests.
-                return Response(ACTION_FAILED, "Bad image or API failure. ")
+                if int(results['header']['status']) > 0:
+                    # One or more indexes are having an issue.
+                    # This search is considered partially successful, even if all indexes failed, so is still counted against your limit.
+                    # The error may be transient, but because we don't want to waste searches, allow time for recovery.
+                    return Response(ACTION_FAILED, "SauceNAO error, pls try again later.")
+                else:
+                    # Problem with search as submitted, bad image, or impossible request.
+                    # Issue is unclear, so don't flood requests.
+                    return Response(ACTION_FAILED, "Bad image or other request error. ")
+        else:
+            # General issue, api did not respond. Normal site took over for this error state.
+            # Issue is unclear, so don't flood requests.
+            return Response(ACTION_FAILED, "Bad image or API failure. ")
 
         # print(results)
         #found_json = {"type": "success", "rate": "{0}%".format(str(results['results'][0]['header']['similarity'])), "data": {}}

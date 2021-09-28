@@ -8,6 +8,15 @@ from io import BytesIO
 Response=BaseResponse
 
 class Api():
+    def __init__(self, refresh_token,**REQUEST_KWARGS):
+        self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS)
+        self.api.set_accept_language('zh_cn')
+        self.api.auth(refresh_token=refresh_token)
+
+
+
+"""
+class Api():
     print("call api")
     __instance = None
     api = None
@@ -20,11 +29,11 @@ class Api():
             cls.api.set_accept_language("en_us") 
             cls.api.auth(refresh_token=refresh_token)
         return cls.__instance
+"""
 
 
 
-
-async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None)->Response:
+async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
     """对指定关键词搜索, 施加限定条件, 返回图片, 详见pixivpy3.search_illust  
     Args:    
     * ``refresh_token: str ``: pixiv登陆token  
@@ -34,6 +43,8 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
     * ``duration: str``: 区间, 最近一日, 最近一周,最近一月...
     * ``index: int``: 希望取得的排行第几位的图片
     * ``_REQUESTS_KWARGS: dict``: http请求参数, 代理
+    * ``proxy: str``: 代理
+    * ``full: bool``: 是否返回原图, 默认返回large
     
     代理模板:
     >>> _REQUESTS_KWARGS = {
@@ -60,11 +71,25 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
         
     duration = "within_last_" + duration
     res_json = api.search_illust(word, search_target, sort, duration)
-    illust_list = sorted([{"title": illust.title, "id": illust.id, "bookmark": int(illust.total_bookmarks), "large_url": illust.image_urls["large"]} for illust in res_json.illusts],key=operator.itemgetter("bookmark"),reverse=True)
+    print(res_json)
+    illust_list = []
+    for illust in res_json.illusts:
+        if "origin_image_url" in illust.meta_single_page:
+            origin = illust.meta_single_page["origin_image_url"]
+        elif "original_image_url" in illust.meta_single_page:
+            origin = illust.meta_single_page["original_image_url"]
+        else:
+            origin = illust.meta_pages[0]["image_urls"]["original"] # 当图集时， 取图集的第一个
+    
+        illust_list.append({"title":illust.title, "id":illust.id, "bookmark":int(illust.total_bookmarks), "large_url":illust.image_urls["large"], "origin":origin})
+    illust_list.sort(key=operator.itemgetter("bookmark"), reverse=True)
+    #illust_list = sorted([{"title": illust.title, "id": illust.id, "bookmark": int(illust.total_bookmarks), "large_url": illust.image_urls["large"],"origin": illust.meta_single_page["original_image_url"] if ("original_image_url" in illust['meta_single_page']) else illust.meta_single_page["origin_image_url"] } for illust in res_json.illusts],key=operator.itemgetter("bookmark"),reverse=True)
     if index > len(illust_list) or index < 1:
         return Response(ACTION_FAILED, f"Index out of range({len(illust_list)})", )
-    
-    res = await get_pixiv_image(illust_list[index-1]["large_url"],proxy)
+    if full:
+        res = await get_pixiv_image(illust_list[index-1]['origin'],proxy)
+    else:
+        res = await get_pixiv_image(illust_list[index-1]["large_url"],proxy)
     if res.status_code // 100 != 2:
         return Response(ACTION_FAILED, message=f"{res.message}")
     else:
@@ -84,15 +109,18 @@ async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -
         * `` Response.content: Image.Image`` : 图片
         * `` Response.message: str`` : 请求失败的原因
     """
-    try:
-        async with httpx.AsyncClient(proxies=proxies) as client:
-            res = await client.get(url, headers=headers, timeout=5)
-            res.raise_for_status()
-    except httpx.ProxyError as exc:
-        return Response(ACTION_FAILED,message="httpx proxy error.")
-    except httpx.HTTPStatusError as exc:
-        return Response(ACTION_FAILED,message=f"Error response {exc.response.status_code} while requesting {exc.request.url!r}.")
-    return Response(ACTION_SUCCESS, content=BytesIO(res.content))
+    _retry = 3
+    while True:
+        try:
+            async with httpx.AsyncClient(proxies=proxies) as client:
+                res = await client.get(url, headers=headers, timeout=5)
+                #res.raise_for_status()
+                return Response(ACTION_SUCCESS, content=BytesIO(res.content))
+
+        except Exception:
+            _retry -= 1
+            if _retry == 0:
+                return Response(ACTION_FAILED, message="下载图片出现错误, 请稍后再试")
 
 
 async def get_pixiv_image_by_pid(pid,refresh_token,_REQUESTS_KWARGS=None,proxies=None)->Response:
