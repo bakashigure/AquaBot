@@ -6,7 +6,7 @@ from nonebot import get_driver
 from pathlib import Path
 from nonebot.log import logger
 import oss2
-logger.warning("IMPORT CONFIG")
+logger.warning("importing config...")
 
 
 class Config(BaseSettings):
@@ -23,18 +23,25 @@ _config = dict()  # 读取配置
 
 _help_url = "https://example.com"
 
-
 if global_config.aqua_bot_debug.lower() == "true":
     _config["debug"] = True
 else:
     _config["debug"] = False
 
+# proxy
+if len(global_config.aqua_bot_global_proxy) > 0:
+    _config['proxy'] = global_config.aqua_bot_global_proxy
+else:
+    _config['proxy'] = None
 _config['cqhttp'] = global_config.cqhttp
 _config['storage'] = global_config.aqua_bot_pic_storage
 _config['database'] = global_config.aqua_bot_database
 _config['cache'] = global_config.aqua_bot_pic_cache_dir
-# 进行一个cqhttp地址的检测, 因为需要读取图片
 
+# 发送每日一夸的群组
+_config['daily'] = list(global_config.aqua_bot_groups_daily)
+
+# 进行一个cqhttp地址的检测, 因为需要读取图片
 if not _config['cqhttp']:
     logger.error("未设置cqhttp路径, 请修改.env文件")
     exit()
@@ -109,11 +116,5 @@ if not _config['saucenao_api']:
 
 # language相关
 _config['language'] = global_config.aqua_bot_language
-if _config['language'] not in ['aqua','chinese','english','japanese']:
+if _config['language'] not in ['aqua', 'chinese', 'english', 'japanese']:
     logger.error("language设置不正确, 请检查.env文件")
-
-
-
-
-
-

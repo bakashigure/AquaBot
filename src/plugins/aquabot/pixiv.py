@@ -145,8 +145,8 @@ async def get_pixiv_image_by_pid(pid,refresh_token,_REQUESTS_KWARGS=None,proxies
     """
     api = Api(refresh_token,**_REQUESTS_KWARGS).api
     illust_info = api.illust_detail(pid)
-    print(illust_info)
-    print(type(illust_info))
+    #print(illust_info)
+    #print(type(illust_info))
     _info = {"title":illust_info['illust']['title'],"♡":illust_info['illust']['total_bookmarks'],"id":illust_info['illust']['id']}
     _image = await get_pixiv_image(illust_info["illust"]["image_urls"]["large"],proxies)
     return Response(ACTION_SUCCESS,content=(_info,_image.content))

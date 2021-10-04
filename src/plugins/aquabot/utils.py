@@ -18,7 +18,7 @@ from time import time
 from os.path import getsize
 from .response import *
 
-logger.warning("IMPORT UTILS")
+logger.warning("importing utils...")
 
 global_config = nonebot.get_driver().config
 

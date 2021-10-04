@@ -14,7 +14,7 @@ from asyncio import sleep as asyncio_sleep
 import nonebot
 #import oss2
 from aiofiles import open as aiofiles_open
-from nonebot import on_command,require
+from nonebot import get_bot, on_command,require
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.cqhttp import MessageSegment, escape, unescape, PokeNotifyEvent
 from nonebot.adapters.cqhttp.event import GroupMessageEvent, MessageEvent
@@ -33,7 +33,7 @@ from .utils import (ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING,
 from .utils import record_id as _record_id
 from .text import text as _text
 
-logger.warning("IMPORT AQUABOT")
+logger.warning("importing AquaBot..")
 
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
@@ -94,7 +94,8 @@ class DB:
         try:
             with open(self.record_file, "r") as f:
                 self.db = json.load(f)
-                print("DB: %s" % self.db)
+                logger.info("loaded db")
+                #print("DB: %s" % self.db)
 
         except FileNotFoundError:
             logger.warning("record file not set, will create in %s" % self.record_file)
@@ -105,7 +106,7 @@ class DB:
             self.reload()
             self.db["version"] = self.__version__
             self.last_update()
-            logger.warning("DB: %s" % self.db)
+            #logger.warning("DB: %s" % self.db)
             self.save()
 
         except JSONDecodeError as e:
@@ -252,14 +253,6 @@ args = list()
 def record_id(k, v):
     return _record_id(db.messages, k, v)
 
-
-async def misc():
-    """定时脚本
-    清理cache, 保存json.
-    """
-    ...
-
-
 @aqua.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
     global args
@@ -380,8 +373,6 @@ async def upload_by_reply(bot: Bot, event: Event):
     pass
 
 
-async def upload_by_image(path: str, user_id):
-    ...
 
 
 async def delete_aqua(bot: Bot, event: Event):
@@ -427,22 +418,32 @@ async def func(bot: Bot, event: Event):
 async def help_aqua(bot: Bot, event: Event):
     return await bot.send(event, MessageSegment.text(_text['chinese']['help']))
 
+async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
+    if res.status_code // 100 == 2:
+        info, image = res.content
+        image = MessageSegment.image(image)
+        _text = f"{info['title']}\n♡: {info['bookmark']}  pid: {info['id']}"
+        _message = MessageSegment.text(_text)
+        await bot.send(event, _message)
+        await bot.send(event, image)
+    else:
+        await bot.send(event, MessageSegment.text(res.message))
 
 async def pixiv_aqua(bot: Bot, event: Event):
     logger.warning(args)
 
     _full = False
-    if _len := len(args) == 3:
+    if len(args) == 3:
         _, dur, index = args
         word = "湊あくあ"
-    elif _len == 4:
+    elif len(args) == 4:
         if args[-1] == "full":    # pixiv day 1 full
-            _word = "湊あくあ"
+            word = "湊あくあ"
             _, dur, index, _full = args
             _full = True
         else:   # pixiv some day 1
             _, word, dur, index = args
-    elif _len == 5:
+    elif len(args) == 5:
         _, word, dur, index, full = args
         if (full != "full"):
             return await bot.send(event, MessageSegment.text("参 数 错 误"))
@@ -457,15 +458,8 @@ async def pixiv_aqua(bot: Bot, event: Event):
             'https': 'http://127.0.0.1:7890',
         }, }
     res = await pixiv_search(refresh_token=_config['refresh_token'], word=word, search_target='partial_match_for_tags', sort='popular_desc', duration=dur, index=index, _REQUESTS_KWARGS=_REQUESTS_KWARGS, proxy="http://127.0.0.1:7890", full=_full)
-    if res.status_code // 100 == 2:
-        info, image = res.content
-        image = MessageSegment.image(image)
-        _text = f"title: {info['title']}\n♡: {info['bookmark']}\npid: {info['id']}"
-        _message = MessageSegment.text(_text)
-        await bot.send(event, _message)
-        await bot.send(event, image)
-    else:
-        await bot.send(event, MessageSegment.text(res.message))
+    await _pixiv_res_handle(bot, event, res)
+
 
 
 async def test_aqua(bot: Bot, event: Event):
@@ -492,8 +486,9 @@ async def _(bot: Bot, event: Event):
 
 async def reload_aqua(bot: Bot, event: Event):
     return db.reload()
-    MessageSegment.reply()
+   
 
+# 回复搜图
 get_id = on_message(priority=7)
 @get_id.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
@@ -552,3 +547,21 @@ async def search_aqua(bot: Bot, event: Event):
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
         else:
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
+
+# 每日一夸
+@scheduler.scheduled_job('cron', hour=17, minute=46, second=10)
+async def daily_aqua():
+    _REQUESTS_KWARGS = {
+        'proxies': {
+            'https': 'http://127.0.0.1:7890',
+        }, }
+    bot = get_bot()
+    info, image = (await pixiv_search(refresh_token=_config['refresh_token'], word="湊あくあ", search_target='partial_match_for_tags', sort='popular_desc', duration="day", index=1, _REQUESTS_KWARGS=_REQUESTS_KWARGS, proxy="http://127.0.0.1:7890", full=True)).content
+    _text = MessageSegment.text(f"#每日一夸#\n{info['title']}\n♡: {info['bookmark']}  pid: {info['id']}")
+    for group in _config['daily']:
+        await asyncio_sleep(1)
+        print(type(image))
+        print(image)
+        await bot.call_api("send_group_msg",**{"group_id":group,"message":_text})
+        await bot.call_api("send_group_msg", **{"group_id":group,"message":MessageSegment.image(image)})
+
