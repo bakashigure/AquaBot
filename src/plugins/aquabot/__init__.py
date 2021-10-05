@@ -25,9 +25,10 @@ from nonebot.typing import T_State
 from PIL import Image
 
 from .config import Config, _config
-from .pixiv import get_pixiv_image_by_pid, pixiv_search, get_pixiv_image
+from .pixiv import get_pixiv_image_by_pid, pixiv_search, get_pixiv_image,_safe_get_image
 from .response import BaseResponse
 from .saucenao import saucenao_search
+from .ascii2d import Ascii2D
 from .utils import (ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING,
                     get_message_image, get_message_text, get_path, upload_to_local)
 from .utils import record_id as _record_id
@@ -504,13 +505,8 @@ async def _(bot: Bot, event: GroupMessageEvent):
                 images = await get_message_image(msg, type='file')
 
                 for image in images:
-                    res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
-                    if res.status_code // 100 == 2:
-                        _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
+                    await _search_handle(bot,event,image)
 
-                        await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
-                    else:
-                        await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
 
 
 poke_aqua = on_notice() # 戳一戳
@@ -540,13 +536,25 @@ async def search_aqua(bot: Bot, event: Event):
     if len(images) == 0:
         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("给点图?"))
     for image in images:
+        await _search_handle(bot,event,image)
+
+async def _search_handle(bot,event,image):
         res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
         if res.status_code // 100 == 2:
             _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
 
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
         else:
-            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
+            a = Ascii2D()
+            res = await a.search(image)
+
+            if res.status_code // 100 == 2:
+                _s = "\n".join([f"{k}: {v}"for k, v in res.content.items()])
+            elif res.status_code // 100 == 3:
+                _s = "请自行对比缩略图是否相同(\n" + "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
+                image = (await _safe_get_image(res.content[1],proxies="http://127.0.0.1:7890")).content
+                await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s)+MessageSegment.image(image))
+            #await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))    
 
 # 每日一夸
 @scheduler.scheduled_job('cron', hour=17, minute=46, second=10)

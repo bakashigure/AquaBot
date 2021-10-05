@@ -56,7 +56,7 @@ Usage
 * aqua upload [夸图] - 上传夸图(支持多张)
 * aqua delete [夸图id] - 删除夸图
 * aqua pixiv (可选关键词) ['day','week','month'] [index] - 返回关键词在指定区间内最受欢迎的第index张图
-* aqua search [图] - 在saucenao中搜索这张图(支持多张), 支持来源twitter, pixiv...
+* aqua search [图] - 在saucenao和ascii2d中搜索这张图(支持多张), 支持来源twitter, pixiv...
 * aqua stats - 现在有多少张夸图?
 _____________________________________
 * aqua debug [cmd] - 执行内部指令, 并输出结果(可能) 
@@ -67,6 +67,9 @@ TIP: 请注意指令间的空格
 ```
 ChangeLog
 =========================
+`2.1.0`
+* [+] 搜索来源中增加了ascii2d
+
 `v2.0.4`
 * [+] 修bug修bug
 * [+] 重新添加了每日一夸

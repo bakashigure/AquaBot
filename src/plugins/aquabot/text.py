@@ -1,4 +1,4 @@
-__version__ = "2.0.4"
+__version__ = "2.1.0"
 
 text = dict()
 text['english'] = dict()
@@ -41,7 +41,7 @@ aqua help - 您要找的是不是 'aqua help'?\n\
 aqua upload [夸图] - 上传夸图(支持多张)\n\
 aqua delete [夸图id] - 删除夸图\n\
 aqua pixiv (关键词) ['day','week','month'] [index] ('full') - 返回关键词在指定区间内最受欢迎的第index张图, 关键词中的空格请用下划线替代\n\
-aqua search [图] - 在saucenao中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
+aqua search [图] - 在saucenao和ascii2d中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
 aqua stats - 现在有多少张夸图?\n\
 _____________________________________\n\
 aqua debug [cmd] - 执行内部同步命令, 并输出结果(可能) \n\
