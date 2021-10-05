@@ -100,7 +100,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
 
         if int(results['header']['results_returned']) > 0:
             artwork_url = ""
-            print(results)
+            #print(results)
             rate = results['results'][0]['header']['similarity']+'%'
             # one or more results were returned
             if float(results['results'][0]['header']['similarity']) > float(results['header']['minimum_similarity']):
@@ -108,7 +108,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
                                     [0]['header']['similarity']))
                 # print(results)
                 # get vars to use
-                index = ''
+                #index = ''
                 illust_id = 0
                 member_id = -1
                 index_id = results['results'][0]['header']['index_id']
@@ -120,7 +120,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
 
                 if index_id == 5 or index_id == 6:
                     # 5->pixiv 6->pixiv historical
-                    index = 'pixiv'
+                    found_json['index'] = "pixiv"
                     member_name = results['results'][0]['data']['member_name']
                     illust_id = results['results'][0]['data']['pixiv_id']
                     title = results['results'][0]['data']['title']
@@ -130,25 +130,25 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
                 elif index_id == 8:
                     # 8->nico nico seiga
                     
-                    index = 'seiga'
+                    found_json['index'] = 'seiga'
                     member_id = results['results'][0]['data']['member_id']
                     illust_id = results['results'][0]['data']['seiga_id']
                     found_json['data'] = {"member_id": member_id, "illust_id": illust_id}
                 elif index_id == 10:
                     # 10->drawr
-                    index = 'drawr'
+                    found_json['index'] = 'drawr'
                     member_id = results['results'][0]['data']['member_id']
                     illust_id = results['results'][0]['data']['drawr_id']
                     found_json['data'] = {"member_id": member_id, "illust_id": illust_id}
                 elif index_id == 11:
                     # 11->nijie
-                    index = 'nijie'
+                    found_json['index'] = 'nijie'
                     member_id = results['results'][0]['data']['member_id']
                     illust_id = results['results'][0]['data']['nijie_id']
                     found_json['data'] = {"member_id": member_id, "illust_id": illust_id}
                 elif index_id == 34:
                     # 34->da
-                    index = 'da'
+                    found_json['index'] = 'da'
                     illust_id = results['results'][0]['data']['da_id']
                     found_json['data'] = {"illust_id": illust_id}
                 elif index_id == 9:
@@ -198,10 +198,17 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
                     if (x:=results['results'][0]['data']['eng_name']):
                         found_json['data']['eng_name']=x
 
+                elif index_id == 31:
+                    # 31 -> bcy.net
+                    found_json['index'] = "bcy"
+                    url = results['results'][0]['data']['ext_urls']
+                    title = results['results'][0]['data']['title']
+                    member_name = results['results'][0]['data']['member_name']
+                    found_json['data']={'title': title,'url': url, 'member_name': member_name}
 
                 else:
                     return Response(ACTION_FAILED, message=f"Unhandled Index {index_id},check log for more infomation")
-                found_json['index'] = index
+                #found_json['index'] = index
                 found_json['rate']=rate
                 return Response(ACTION_SUCCESS, content=found_json)
 

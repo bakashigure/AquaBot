@@ -1,10 +1,27 @@
-import requests
-import urllib3
+from typing import Coroutine
 from bs4 import BeautifulSoup
 from loguru import logger
 from requests_toolbelt import MultipartEncoder
+import httpx 
+import aiofiles
+import asyncio
+from .response import *
 
-# !!! code from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py !!!
+# code from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py 
+
+def sync(coroutine: Coroutine):
+    """
+    同步执行异步函数
+
+    Args:
+        coroutine (Coroutine): 异步函数
+
+    Returns:
+        该异步函数的返回值
+    """
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(coroutine)
+
 
 
 class Ascii2DNorm:
@@ -84,7 +101,7 @@ class Ascii2D:
 
     @staticmethod
     def _slice(res):
-        soup = BeautifulSoup(res, 'html.parser', from_encoding='utf-8')
+        soup = BeautifulSoup(res, 'html.parser')
         resp = soup.find_all(class_='row item-box')
         return Ascii2DResponse(resp)
 
@@ -107,7 +124,7 @@ class Ascii2D:
         else:
             return "Unknown error, please report to the project maintainer"
 
-    def search(self, url):
+    async def search(self, url):
         """
         Ascii2D
         -----------
@@ -123,32 +140,25 @@ class Ascii2D:
         • .raw[0].thumbnail = First index of url image that was found\n
         • .raw[0].detail = First index of details image that was found
         """
-        try:
-            if url[:4] == 'http':  # 网络url
-                ASCII2DURL = 'https://ascii2d.net/search/uri'
-                m = MultipartEncoder(
-                    fields={
-                        'uri': url
-                    }
-                )
-            else:  # 是否是本地文件
-                ASCII2DURL = 'https://ascii2d.net/search/file'
-                m = MultipartEncoder(
-                    fields={
-                        'file': ('filename', open(url, 'rb'), "type=multipart/form-data")
-                    }
-                )
-            headers = {'Content-Type': m.content_type}
-            urllib3.disable_warnings()
-            res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
-            if res.status_code == 200:
-                return self._slice(res.text)
+
+        files = {'file': ("img.png", open(url, 'rb'),"image/png")}
+        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890")
+        res = await client.post("https://ascii2d.net/search/multi", files=files)
+        await client.aclose()
+        #res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
+        if res.status_code == 200:
+            # 处理逻辑： 先看第一个返回结果是否带上title，如果有说明这张图已经被搜索过了，有直接结果
+            # 如果第一个结果的title为空，那么直接返回第二个结果，带上缩略图让用户自行比对是否一致
+            _res =  self._slice(res.text)
+            if _res.raw[0].title != "":
+            #    return BaseResponse(ACTION_FAILED,"ascii2d not found.")
+                return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d",{'index':"ascii2d", 'url': _res.raw[0].url, 'authors': _res.raw[0].authors})
             else:
-                logger.error(res.status_code)
-                logger.error(self._errors(res.status_code))
-        except Exception as e:
-            logger.error(e)
+                return BaseResponse(ACTION_WARNING, "get possible result from ascii2d",[{'index':"ascii2d",  'url': _res.raw[1].url, 'authors': _res.raw[1].authors},_res.raw[1].thumbnail])    
+        else:
+            return BaseResponse(ACTION_FAILED, self._errors(res.status_code))
+
+        #except Exception as e:
+        #    logger.error(e)
 
 
-
-a = Ascii2D("http://127.0.0.1:7890")

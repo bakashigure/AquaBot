@@ -71,7 +71,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
         
     duration = "within_last_" + duration
     res_json = api.search_illust(word, search_target, sort, duration)
-    print(res_json)
+    #print(res_json)
     illust_list = []
     for illust in res_json.illusts:
         if "origin_image_url" in illust.meta_single_page:
@@ -109,6 +109,8 @@ async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -
         * `` Response.content: Image.Image`` : 图片
         * `` Response.message: str`` : 请求失败的原因
     """
+
+
     _retry = 3
     while True:
         try:
@@ -117,11 +119,12 @@ async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -
                 #res.raise_for_status()
                 return Response(ACTION_SUCCESS, content=BytesIO(res.content))
 
-        except Exception:
+        except Exception as e:
+            print(e)
             _retry -= 1
             if _retry == 0:
                 return Response(ACTION_FAILED, message="下载图片出现错误, 请稍后再试")
-
+    
 
 async def get_pixiv_image_by_pid(pid,refresh_token,_REQUESTS_KWARGS=None,proxies=None)->Response:
     """
