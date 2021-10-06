@@ -1,3 +1,6 @@
+# -*- coding:utf-8 -*-
+# Modified from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py 
+# Created by bakashigure
 from typing import Coroutine
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -6,23 +9,6 @@ import httpx
 import aiofiles
 import asyncio
 from .response import *
-
-# code from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py 
-
-def sync(coroutine: Coroutine):
-    """
-    同步执行异步函数
-
-    Args:
-        coroutine (Coroutine): 异步函数
-
-    Returns:
-        该异步函数的返回值
-    """
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(coroutine)
-
-
 
 class Ascii2DNorm:
     URL = 'https://ascii2d.net'

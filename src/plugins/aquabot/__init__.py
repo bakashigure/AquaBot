@@ -540,6 +540,8 @@ async def search_aqua(bot: Bot, event: Event):
 
 async def _search_handle(bot,event,image):
         res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
+        logger.warning(res.status_code)
+        logger.warning(res.content)
         if res.status_code // 100 == 2:
             _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
 
