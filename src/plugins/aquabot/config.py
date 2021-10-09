@@ -33,10 +33,10 @@ if len(global_config.aqua_bot_global_proxy) > 0:
     _config['proxy'] = global_config.aqua_bot_global_proxy
 else:
     _config['proxy'] = None
-_config['cqhttp'] = global_config.cqhttp
+_config['cqhttp'] = Path(global_config.cqhttp).resolve()
 _config['storage'] = global_config.aqua_bot_pic_storage
-_config['database'] = global_config.aqua_bot_database
-_config['cache'] = global_config.aqua_bot_pic_cache_dir
+_config['database'] = Path(global_config.aqua_bot_database).resolve()
+_config['cache'] = Path(global_config.aqua_bot_pic_cache_dir).resolve
 
 # 发送每日一夸的群组
 _config['daily'] = list(global_config.aqua_bot_groups_daily)

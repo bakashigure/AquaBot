@@ -5,6 +5,7 @@ from os import remove as os_remove
 from os import walk as os_walk
 from os.path import getsize as os_getsize
 from pathlib import Path
+import pathlib
 from random import randint
 from threading import Lock
 from re import search as re_search
@@ -45,6 +46,9 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
+
+p = pathlib.Path("src/plugins/aquabot/database.json").resolve()
+logger.warning(p)
 
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
@@ -540,6 +544,8 @@ async def search_aqua(bot: Bot, event: Event):
 
 async def _search_handle(bot,event,image):
         res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
+        logger.warning(res.status_code)
+        logger.warning(res.content)
         if res.status_code // 100 == 2:
             _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
 

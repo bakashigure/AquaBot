@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 # Modified from https://saucenao.com/tools/examples/api/identify_images_v1.1.py
 # Created by bakashigure
-# Last updated 2021/9/16
+
 
 import io
 import json
@@ -64,7 +64,6 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
         r = await client.post(url=url_all, files=files)
  
 
-    print(r)
     if r.status_code != 200:
         if r.status_code == 403:
             return Response(ACTION_FAILED, message="Incorrect or Invalid API Key!")
@@ -100,7 +99,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
 
         if int(results['header']['results_returned']) > 0:
             artwork_url = ""
-            #print(results)
+            print(results)
             rate = results['results'][0]['header']['similarity']+'%'
             # one or more results were returned
             if float(results['results'][0]['header']['similarity']) > float(results['header']['minimum_similarity']):
@@ -201,10 +200,18 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
                 elif index_id == 31:
                     # 31 -> bcy.net
                     found_json['index'] = "bcy"
-                    url = results['results'][0]['data']['ext_urls']
+                    url = results['results'][0]['data']['ext_urls'][0]
                     title = results['results'][0]['data']['title']
                     member_name = results['results'][0]['data']['member_name']
                     found_json['data']={'title': title,'url': url, 'member_name': member_name}
+                
+                elif index_id == 39:
+                    # 39 -> Artstation
+                    found_json['index'] = "artstation"
+                    url = results['results'][0]['data']['ext_urls'][0]
+                    title = results['results'][0]['data']['title']
+                    author_name = results['results'][0]['data']['author_name']
+                    found_json['data']={'title': title,'url': url, 'author_name': author_name}
 
                 else:
                     return Response(ACTION_FAILED, message=f"Unhandled Index {index_id},check log for more infomation")
