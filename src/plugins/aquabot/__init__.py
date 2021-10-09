@@ -5,6 +5,7 @@ from os import remove as os_remove
 from os import walk as os_walk
 from os.path import getsize as os_getsize
 from pathlib import Path
+import pathlib
 from random import randint
 from threading import Lock
 from re import search as re_search
@@ -45,6 +46,9 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
+
+p = pathlib.Path("src/plugins/aquabot/database.json").resolve()
+logger.warning(p)
 
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
