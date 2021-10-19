@@ -129,20 +129,29 @@ class Ascii2D:
 
         files = {'file': ("img.png", open(url, 'rb'),"image/png")}
         client = httpx.AsyncClient(proxies="http://127.0.0.1:7890")
-        res = await client.post("https://ascii2d.net/search/multi", files=files)
-        await client.aclose()
+        color_res = await client.post("https://ascii2d.net/search/multi", files=files)
+        bovw_url = color_res.url.__str__().replace("/color/","/bovw/")
+        bovw_res = await client.get(bovw_url)
+        await client.aclose() 
         #res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
-        if res.status_code == 200:
+       
+        if color_res.status_code == 200 and bovw_res.status_code==200:
             # 处理逻辑： 先看第一个返回结果是否带上title，如果有说明这张图已经被搜索过了，有直接结果
             # 如果第一个结果的title为空，那么直接返回第二个结果，带上缩略图让用户自行比对是否一致
-            _res =  self._slice(res.text)
-            if _res.raw[0].title != "":
+            _color_res =  self._slice(color_res.text)
+            _bovw_res = self._slice(bovw_res.text)
+            if _color_res.raw[0].title != "":
             #    return BaseResponse(ACTION_FAILED,"ascii2d not found.")
-                return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d",{'index':"ascii2d", 'url': _res.raw[0].url, 'authors': _res.raw[0].authors})
+                return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d color",{'index':"ascii2d", 'url': _color_res.raw[0].url, 'authors': _color_res.raw[0].authors})
             else:
-                return BaseResponse(ACTION_WARNING, "get possible result from ascii2d",[{'index':"ascii2d",  'url': _res.raw[1].url, 'authors': _res.raw[1].authors},_res.raw[1].thumbnail])    
+                if _bovw_res.raw[0].title!="":
+                    return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d bovw",{'index':"ascii2d", 'url': _bovw_res.raw[0].url, 'authors': _bovw_res.raw[0].authors})
+
+                return BaseResponse(ACTION_WARNING, "get possible result from ascii2d",[
+                    {'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors},_color_res.raw[1].thumbnail,
+                    {'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors},_bovw_res.raw[1].thumbnail])    
         else:
-            return BaseResponse(ACTION_FAILED, self._errors(res.status_code))
+            return BaseResponse(ACTION_FAILED, self._errors(color_res.status_code))
 
         #except Exception as e:
         #    logger.error(e)

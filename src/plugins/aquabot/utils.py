@@ -74,7 +74,6 @@ async def get_message_image(data, type: Literal["file", "url"]) -> list:
             if type == "file":
                 _file_detail = await bot.get_image(file=message["data"][type])
                 _path = path + "/" + str(_file_detail["file"])
-                # TODO add linux file system
                 _img_list.append(_path)
             else:
                 _img_list.append(message["data"][type])

@@ -12,7 +12,14 @@ __pycache__/
 keys.py
 .pep8
 data.txt
-img/
+*.jpeg
+*.zip
+*.jpeg
+*.jpg
+*.gif
+
+
+
 database.json
 
 # C extensions
@@ -21,8 +28,6 @@ database.json
 # Distribution / packaging
 .Python
 build/
-cache/
-cache/*
 develop-eggs/
 dist/
 downloads/
@@ -152,3 +157,4 @@ src/plugins/aquabot/test.py
 .vscode/settings.json
 settings.json
 .vscode/settings.json
+src/plugins/aquabot/testt.py

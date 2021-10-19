@@ -15,10 +15,11 @@ from asyncio import sleep as asyncio_sleep
 import nonebot
 #import oss2
 from aiofiles import open as aiofiles_open
-from nonebot import get_bot, on_command,require
+from nonebot import get_bot, on_command, require
 from nonebot.adapters import Bot, Event
 from nonebot.adapters.cqhttp import MessageSegment, escape, unescape, PokeNotifyEvent
 from nonebot.adapters.cqhttp.event import GroupMessageEvent, MessageEvent
+from nonebot.adapters.cqhttp.message import Message
 from nonebot.log import logger
 from nonebot.plugin import on_message, on_notice, on_regex
 from nonebot.rule import to_me
@@ -26,7 +27,7 @@ from nonebot.typing import T_State
 from PIL import Image
 
 from .config import Config, _config
-from .pixiv import get_pixiv_image_by_pid, pixiv_search, get_pixiv_image,_safe_get_image
+from .pixiv import get_pixiv_image_by_pid, pixiv_search, get_pixiv_image, _safe_get_image
 from .response import BaseResponse
 from .saucenao import saucenao_search
 from .ascii2d import Ascii2D
@@ -50,6 +51,7 @@ scheduler = require("nonebot_plugin_apscheduler").scheduler
 p = pathlib.Path("src/plugins/aquabot/database.json").resolve()
 logger.warning(p)
 
+
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,7 +67,7 @@ class DB:
     """
     {
       "AquaBot": "this file created by aqua bot, please do not modify this file",
-      "last_update": "", 
+      "last_update": "",
       "records": "",
       "version":"",
       "local": {
@@ -223,10 +225,10 @@ class DB:
 
     async def get_random(self) -> Response:
         if self.db['available_count'] == 0:
-            Response(ACTION_FAILED, "no record available, will refresh records")
+            Response(ACTION_FAILED, "No record available, will refresh records")
             self.refresh()  # 即刻触发refresh
             if self.db["total_count"] == 0:
-                return Response(ACTION_FAILED, "no record available")
+                return Response(ACTION_FAILED, message="No record available, please upload some pictures :)")
         choice = randint(0, self.db['available_count'] - 1)
         key = self.db_keys[choice]
         del self.db_keys[choice]
@@ -240,7 +242,7 @@ class DB:
 
         if _config['storage'] == 'local':
             value = "file:///" + value
-        return Response(ACTION_SUCCESS, content=(key, f"{value}"))
+        return Response(ACTION_SUCCESS, message="Get a random picture.",content=(key, f"{value}"))
 
     def get_picture_id(self, k):
         k = str(k)
@@ -257,6 +259,7 @@ args = list()
 
 def record_id(k, v):
     return _record_id(db.messages, k, v)
+
 
 @aqua.handle()
 async def handle_first_receive(bot: Bot, event: Event, state: T_State):
@@ -302,7 +305,7 @@ async def random_aqua(bot: Bot, event: Event):
         id = await bot.send(event, MessageSegment.image(image))
         record_id(id, key)
     else:
-        await bot.send(event, MessageSegment.text("no available images!"))
+        await bot.send(event, MessageSegment.text("并没有能发的图..."))
 
 
 async def upload_aqua(bot: Bot, event: Event):
@@ -337,11 +340,11 @@ async def upload_aqua(bot: Bot, event: Event):
                 _id = "pixiv_" + res['id'].__str__()
                 _id_with_format = _id + '.jpeg'
                 if db.exist(_id_with_format) or db.exist(_id):
-                    _response.content = "已经传过了."
+                    _response.content = "这张图已经被上传了"
                     return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_response.content))
                 else:
                     await db.upload(image, _config['dir'], _id)
-                    _response.content = f"{_id_with_format} 上传成功."
+                    _response.content = f"{_id_with_format} 上传成功"
                     return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_response.content))
 
         else:
@@ -358,16 +361,16 @@ async def upload_aqua(bot: Bot, event: Event):
                         _id_with_format = _id + '.jpeg'
                         _response.content = f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
                         if db.exist(_id_with_format):
-                            _response.content += f"{_id_with_format} 已经传过了."
+                            _response.content += f"{_id_with_format} 已经传过了"
                             return await bot.send(event, MessageSegment.text(_response.content))
                         else:
                             await db.upload(image, _config['dir'], _id)
-                            _response.content += f"{_id_with_format} 上传成功."
+                            _response.content += f"{_id_with_format} 上传成功"
                             return await bot.send(event, MessageSegment.text(_response.content))
                     else:
                         _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
                         _id_with_format, _ = (await db.upload(image, _config['dir'], _id)).content
-                        _response.content += f"{_id_with_format} 上传成功."
+                        _response.content += f"{_id_with_format} 上传成功"
                         return await bot.send(event, MessageSegment.text(_response.content))
 
 
@@ -378,13 +381,9 @@ async def upload_by_reply(bot: Bot, event: Event):
     pass
 
 
-
-
 async def delete_aqua(bot: Bot, event: Event):
     """删除一张夸图
     """
-    print(event.json)
-    print(event)
     res = await db.delete(args[1])
     answer = MessageSegment.reply(event.message_id) + MessageSegment.text(res.message)
     await bot.send(event, answer)
@@ -423,6 +422,7 @@ async def func(bot: Bot, event: Event):
 async def help_aqua(bot: Bot, event: Event):
     return await bot.send(event, MessageSegment.text(_text['chinese']['help']))
 
+
 async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
     if res.status_code // 100 == 2:
         info, image = res.content
@@ -433,6 +433,7 @@ async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
         await bot.send(event, image)
     else:
         await bot.send(event, MessageSegment.text(res.message))
+
 
 async def pixiv_aqua(bot: Bot, event: Event):
     logger.warning(args)
@@ -466,11 +467,12 @@ async def pixiv_aqua(bot: Bot, event: Event):
     await _pixiv_res_handle(bot, event, res)
 
 
-
 async def test_aqua(bot: Bot, event: Event):
     await bot.send(event=event, message="i got test")
 
 moremore_aqua = on_command("多来点夸图", priority=6)
+
+
 @moremore_aqua.handle()
 async def _(bot: Bot, event: Event):
     return await more_aqua(bot, event)
@@ -484,6 +486,8 @@ async def more_aqua(bot: Bot, event: Event):
 
 
 one_aqua = on_command("来点夸图", aliases={"夸图来"}, priority=6)
+
+
 @one_aqua.handle()
 async def _(bot: Bot, event: Event):
     return await random_aqua(bot, event)
@@ -491,10 +495,12 @@ async def _(bot: Bot, event: Event):
 
 async def reload_aqua(bot: Bot, event: Event):
     return db.reload()
-   
+
 
 # 回复搜图
 get_id = on_message(priority=7)
+
+
 @get_id.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
     r = re_search(r'\[CQ:reply,id=(-?\d*)]', event.raw_message)
@@ -509,11 +515,12 @@ async def _(bot: Bot, event: GroupMessageEvent):
                 images = await get_message_image(msg, type='file')
 
                 for image in images:
-                    await _search_handle(bot,event,image)
+                    await _search_handle(bot, event, image)
 
 
+poke_aqua = on_notice()  # 戳一戳
 
-poke_aqua = on_notice() # 戳一戳
+
 @poke_aqua.handle()
 async def _(bot: Bot, event: PokeNotifyEvent):
     if event.self_id == event.target_id:
@@ -540,29 +547,37 @@ async def search_aqua(bot: Bot, event: Event):
     if len(images) == 0:
         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("给点图?"))
     for image in images:
-        await _search_handle(bot,event,image)
+        await _search_handle(bot, event, image)
 
-async def _search_handle(bot,event,image):
-        res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
-        logger.warning(res.status_code)
-        logger.warning(res.content)
+
+async def _search_handle(bot, event, image):
+    res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
+    logger.warning(res.status_code)
+    logger.warning(res.content)
+    if res.status_code // 100 == 2:
+        _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
+
+        await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
+    else:
+        a = Ascii2D()
+        res = await a.search(image)
+
         if res.status_code // 100 == 2:
-            _s = f"index: {res.content['index']}\nrate: {res.content['rate']}\n" + '\n'.join([f"{k}: {v}"for k, v in res.content['data'].items()])
+            _s = "\n".join([f"{k}: {v}"for k, v in res.content.items()])
+            return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
+        elif res.status_code // 100 == 3:
+            _s1 = "请自行对比缩略图(\n" + "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
+            _s2 = "请自行对比缩略图(\n" + "\n".join([f"{k}: {v}"for k, v in res.content[2].items()])
+            image1 = (await _safe_get_image(res.content[1], proxies="http://127.0.0.1:7890")).content
+            image2 = (await _safe_get_image(res.content[3], proxies="http://127.0.0.1:7890")).content
+            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s1) + MessageSegment.image(image1))
+            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s2) + MessageSegment.image(image2))
 
-            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
-        else:
-            a = Ascii2D()
-            res = await a.search(image)
-
-            if res.status_code // 100 == 2:
-                _s = "\n".join([f"{k}: {v}"for k, v in res.content.items()])
-            elif res.status_code // 100 == 3:
-                _s = "请自行对比缩略图是否相同(\n" + "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
-                image = (await _safe_get_image(res.content[1],proxies="http://127.0.0.1:7890")).content
-                await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s)+MessageSegment.image(image))
-            #await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))    
+        # await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
 
 # 每日一夸
+
+
 @scheduler.scheduled_job('cron', hour=17, minute=46, second=10)
 async def daily_aqua():
     _REQUESTS_KWARGS = {
@@ -576,6 +591,5 @@ async def daily_aqua():
         await asyncio_sleep(1)
         print(type(image))
         print(image)
-        await bot.call_api("send_group_msg",**{"group_id":group,"message":_text})
-        await bot.call_api("send_group_msg", **{"group_id":group,"message":MessageSegment.image(image)})
-
+        await bot.call_api("send_group_msg", **{"group_id": group, "message": _text})
+        await bot.call_api("send_group_msg", **{"group_id": group, "message": MessageSegment.image(image)})

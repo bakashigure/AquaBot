@@ -5,13 +5,11 @@ import nonebot
 from nonebot import get_driver
 from pathlib import Path
 from nonebot.log import logger
-import oss2
+#import oss2
 logger.warning("importing config...")
 
 
 class Config(BaseSettings):
-    shuffle_timeout: int = 10800
-
     class Config:
         extra = "ignore"
 
@@ -36,7 +34,7 @@ else:
 _config['cqhttp'] = Path(global_config.cqhttp).resolve()
 _config['storage'] = global_config.aqua_bot_pic_storage
 _config['database'] = Path(global_config.aqua_bot_database).resolve()
-_config['cache'] = Path(global_config.aqua_bot_pic_cache_dir).resolve
+_config['cache'] = Path(global_config.aqua_bot_pic_cache_dir).resolve()
 
 # 发送每日一夸的群组
 _config['daily'] = list(global_config.aqua_bot_groups_daily)
@@ -74,6 +72,8 @@ elif _config['storage'] == "oss":
                 "但 aqua_bot_oss_%s 未设置, 请检查.env文件, 配置详见 %s" % (k, _help_url))
             exit()
 
+    # 暂时不打算再搞oss了(
+    """
     _config['auth'] = oss2.Auth(
         _config['access_key_id'], _config['access_key_secret'])
     _config['bucket'] = oss2.Bucket(
@@ -94,7 +94,7 @@ elif _config['storage'] == "oss":
         logger.error(
             "连接OSS时发生错误, 详见 https://help.aliyun.com/document_detail/32039.html")
         exit()
-
+        """
 else:
     _help_url = ""
     logger.error("存储方式不正确, 请检查.env文件, 有关配置详见%s " % _help_url)

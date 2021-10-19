@@ -8,7 +8,7 @@ from io import BytesIO
 Response=BaseResponse
 
 class Api():
-    def __init__(self, refresh_token,**REQUEST_KWARGS):
+    def __init__(self, refresh_token:str,**REQUEST_KWARGS):
         self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS)
         self.api.set_accept_language('zh_cn')
         self.api.auth(refresh_token=refresh_token)
