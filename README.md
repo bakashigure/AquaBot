@@ -1,17 +1,17 @@
-AquaBot 凑·阿库娅bot v2.0.2
+AquaBot 凑·阿库娅bot v2.2.0
 =========================
-此项目为nonebot的插件，可以通过指令发夸图和上传夸图和其他的功能  
+此项目为nonebot2的插件，可以通过指令发夸图和上传夸图和其他的功能  
 凑·阿库娅(湊あくあ)(Minato aqua)是hololive二期生的虚拟YouTuber  
 夸图指凑·阿库娅的同人图
 
 
 Installation
 =========================
-[nonebot](https://v2.nonebot.dev/)  
+[nonebot2](https://v2.nonebot.dev/)  
 [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)  
 前置技能要求: 阅读过nonebot与go-cqhttp的文档.
 
-除此之外，您可能还需要一些特殊的访问pixiv的方式.
+除此之外，您可能还需要一些的, 能访问pixiv和saucenao的方式.
 
 .env 配置
 =========================
@@ -67,6 +67,9 @@ TIP: 请注意指令间的空格
 ```
 ChangeLog
 =========================
+`2.2.0`
+* [+] ascii2d中添加了特征检索
+
 `2.1.0`
 * [+] 搜索来源中增加了ascii2d
 
