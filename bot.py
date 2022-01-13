@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
 import nonebot
-from nonebot.adapters.cqhttp import Bot as CQHTTPBot
+from nonebot.adapters.onebot.v11 import Adapter
+
 
 # Custom your logger
 # 
@@ -19,9 +19,9 @@ nonebot.init(_env_file=".env")
 app = nonebot.get_asgi()
 
 driver = nonebot.get_driver()
-driver.register_adapter("cqhttp", CQHTTPBot)
+driver.register_adapter(Adapter)
 
-nonebot.load_builtin_plugins()
+#nonebot.load_builtin_plugins()
 #nonebot.load_plugin("src.plugins.aquabot.uu")
 #nonebot.load_plugin("nonebot_plugin_test")
 nonebot.load_plugin("src.plugins.aquabot")
@@ -34,6 +34,4 @@ nonebot.load_plugin("src.plugins.aquabot")
 # do something...
 
 
-if __name__ == "__main__":
-    #nonebot.logger.warning("Always use `nb run` to start the bot instead of manually running!")
-    nonebot.run(app="bot:app")
+nonebot.run()
