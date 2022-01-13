@@ -8,9 +8,9 @@ from pathlib import Path
 import json
 from typing import Literal,Union
 import nonebot
-from nonebot import logger
+from nonebot.log import logger
 from PIL import Image
-from nonebot.adapters.cqhttp import message
+from nonebot.adapters.onebot.v11 import message
 import oss2
 import httpx
 from .config import _config
@@ -43,12 +43,9 @@ def _get_bot(bot_id):
     Returns :
         ``bot: nonebot.adapters.cqhttp.bot.Bot)`` :bot实例
     """
-    try:
-        logger.warning(nonebot.get_bots())
-        bot = nonebot.get_bots()[str(bot_id)]
-        return bot
-    except KeyError:
-        logger.error("bot'%s'未连接" % bot_id)
+    bot = nonebot.get_bots()[str(bot_id)]
+    return bot
+
 
 
 async def get_message_image(data, type: Literal["file", "url"]) -> list:
@@ -81,18 +78,12 @@ async def get_message_image(data, type: Literal["file", "url"]) -> list:
     return _img_list
 
 
-def get_message_text(data: str) -> str:
-    """
-    返回消息纯文本
-    """
-    pass
-
 
 def _clear_cache():
     ...
 
 def _tmp_fp()->str:
-    return _config['cache'] + "/" + str(time()).replace(".", "") + ".jpg"
+    return _config['cache'].__str__() + "/" + str(time()).replace(".", "") + ".jpg"
 
 def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     """接受一个图片, 将其转换为jpg, 大小不超过max_size,
@@ -141,7 +132,7 @@ async def _upload_custom(
         `` max_size(int): 最大文件大小, 大于的直接进行一个压缩 
     """
     if _config["storage"] == "local":
-        _origin = resize_image(file=origin, max_size=max_size, k=0.9)
+        _origin = resize_image(origin,max_size, 0.9)
         _origin.save(target + "/" + target_filename)
         _origin.close()
 
@@ -200,7 +191,7 @@ async def __make_sign():
 async def _safe_send(id: int, api: str, **message):
     bot = _get_bot(id)
     try:
-        await bot.call_api(api, message)
+        await bot.call_api(api, **message)
     except Exception as e:
         logger.error("fail to send message, error %s" % e)
 
