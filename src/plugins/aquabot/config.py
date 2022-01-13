@@ -44,6 +44,7 @@ if not _config['cqhttp']:
     logger.error("未设置cqhttp路径, 请修改.env文件")
     exit()
 
+_config['superuser'] = global_config.superusers
 # 检测存储方式为本地或者oss
 if _config['storage'] == "local":
     _config['dir'] = global_config.aqua_bot_pic_dir
@@ -58,7 +59,6 @@ if _config['storage'] == "local":
         logger.warning("配置详见%s" % _help_url)
         _config['dir'] = "src/plugins/aquabot/img"
         _config['dir'] = Path(_config['dir']).absolute()
-
 elif _config['storage'] == "oss":
     _config['access_key_id'] = global_config.aqua_bot_oss_access_key_id
     _config['access_key_secret'] = global_config.aqua_bot_oss_access_key_secret

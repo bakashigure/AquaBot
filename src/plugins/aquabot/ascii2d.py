@@ -128,8 +128,15 @@ class Ascii2D:
         """
 
         files = {'file': ("img.png", open(url, 'rb'),"image/png")}
-        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890")
-        color_res = await client.post("https://ascii2d.net/search/multi", files=files)
+        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890",follow_redirects=True)
+        try:
+            color_res = await client.post("https://ascii2d.net/search/multi", files=files)
+        except httpx.ReadTimeout:
+            await client.aclose()
+            return BaseResponse(ACTION_FAILED,"timeout")
+        except httpx.ProxyError:
+            await client.aclose()
+            return BaseResponse(ACTION_FAILED,"proxy error")
         bovw_url = color_res.url.__str__().replace("/color/","/bovw/")
         bovw_res = await client.get(bovw_url)
         await client.aclose() 
