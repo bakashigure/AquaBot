@@ -1,6 +1,7 @@
-AquaBot 凑·阿库娅bot v2.2.0
+AquaBot 凑·阿库娅bot v2.2.1
 =========================
-此项目为nonebot2的插件，可以通过指令发夸图和上传夸图和其他的功能  
+此项目为基于nonebot2的bot，可以通过指令发夸图和上传夸图和其他的功能  
+属于几乎纯自用bot，所以你很可能部署不起来  
 凑·阿库娅(湊あくあ)(Minato aqua)是hololive二期生的虚拟YouTuber  
 夸图指凑·阿库娅的同人图
 
@@ -18,7 +19,7 @@ Installation
 ```
 ENVIRONMENT=dev
 DEBUG=false
-HOST=127.0.0.1
+HOST=0.0.0.0
 PORT=7777
 
 COMMAND_START=["","/","."]
@@ -67,6 +68,9 @@ TIP: 请注意指令间的空格
 ```
 ChangeLog
 =========================
+`2.2.1`
+* [+] 适配nb2 b1
+
 `2.2.0`
 * [+] ascii2d中添加了特征检索
 
