@@ -569,13 +569,18 @@ async def _search_handle(bot, event, image):
         if res.status_code // 100 == 2:
             _s = "\n".join([f"{k}: {v}"for k, v in res.content.items()])
             return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
-        elif res.status_code // 100 == 3:
+        elif res.status_code  == 300:
             _s1 = "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
             _s2 = "\n".join([f"{k}: {v}"for k, v in res.content[2].items()])
             image1 = (await _safe_get_image(res.content[1], proxies="http://127.0.0.1:7890")).content
             image2 = (await _safe_get_image(res.content[3], proxies="http://127.0.0.1:7890")).content
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s1) + MessageSegment.image(image1))
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s2) + MessageSegment.image(image2))
+        elif res.status_code == 301:
+            _s1 = "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
+            image1 = (await _safe_get_image(res.content[1], proxies="http://127.0.0.1:7890")).content
+            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s1) + MessageSegment.image(image1))
+
         elif res.status_code //100 == 4:
                 await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
                 await bot.send(event,MessageSegment.at(_config['superuser']))
