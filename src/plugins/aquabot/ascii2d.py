@@ -138,6 +138,8 @@ class Ascii2D:
             await client.aclose()
             return BaseResponse(ACTION_FAILED,"proxy error")
         bovw_url = color_res.url.__str__().replace("/color/","/bovw/")
+        logger.warning(bovw_url)
+
         bovw_res = await client.get(bovw_url,follow_redirects=True)
         await client.aclose() 
         #res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
