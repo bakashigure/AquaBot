@@ -60,7 +60,7 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None)->Response:
     _retry = 3
     r = None
 
-    async with httpx.AsyncClient(proxies=proxy) as client:
+    async with httpx.AsyncClient(proxies=proxy,follow_redirects=True) as client:
         try:
             r = await client.post(url=url_all, files=files)
         except httpx.ReadTimeout or httpx.ProxyError:
