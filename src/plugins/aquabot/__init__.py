@@ -45,6 +45,9 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(type(global_config.aqua_bot_pic_storage))
 # logger.warning(global_config.aqua_bot_pic_storage)
 
+
+logger.add("aqua.log")
+
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
 p = pathlib.Path("src/plugins/aquabot/database.json").resolve()
@@ -263,6 +266,8 @@ def record_id(k, v):
 async def handle_first_receive(bot: Bot, event: Event):
     global args
     args = str(event.get_message()).split()
+    if 'aqua' in args[0]:
+        del args[0]
     logger.warning(args)
 
     async def switch(option, bot, event):
@@ -283,7 +288,7 @@ async def handle_first_receive(bot: Bot, event: Event):
         }
         return await optdict[option]()
 
-    await switch(args[1], bot, event)
+    await switch(args[0], bot, event)
 
 
 """
@@ -436,8 +441,7 @@ async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
 
 async def pixiv_aqua(bot: Bot, event: Event):
     logger.warning(args)
-    if 'aqua' in args[0]:
-        del args[0]
+
     _full = False
     if len(args) == 3:
         _, dur, index = args

@@ -108,7 +108,7 @@ class Ascii2D:
         elif code == 500 or code == 503:
             return "Server error, or wrong picture format"
         else:
-            return "Unknown error, please report to the project maintainer"
+            return f"Unknown error{code}"
 
     async def search(self, url):
         """

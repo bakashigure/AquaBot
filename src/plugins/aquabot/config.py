@@ -44,7 +44,7 @@ if not _config['cqhttp']:
     logger.error("未设置cqhttp路径, 请修改.env文件")
     exit()
 
-_config['superuser'] = global_config.superusers
+_config['superuser'] = global_config.superuser
 # 检测存储方式为本地或者oss
 if _config['storage'] == "local":
     _config['dir'] = global_config.aqua_bot_pic_dir
