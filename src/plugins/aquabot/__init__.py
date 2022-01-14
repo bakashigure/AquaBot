@@ -371,11 +371,11 @@ async def upload_aqua(bot: Bot, event: MessageEvent):
                             await db.upload(image, _config['dir'], _id)
                             _response.content += f"{_id_with_format} 上传成功"
                             return await bot.send(event, MessageSegment.text(_response.content))
-                    else:
-                        _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
-                        _id_with_format, _ = (await db.upload(image, _config['dir'], _id)).content
-                        _response.content += f"{_id_with_format} 上传成功"
-                        return await bot.send(event, MessageSegment.text(_response.content))
+                else:
+                    _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
+                    _id_with_format, _ = (await db.upload(image, _config['dir'], _id)).content
+                    _response.content += f"{_id_with_format} 上传成功"
+                    return await bot.send(event, MessageSegment.text(_response.content))
 
 
 async def upload_by_reply(bot: Bot, event: MessageEvent):
