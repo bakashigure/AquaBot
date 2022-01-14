@@ -158,6 +158,8 @@ class Ascii2D:
                     {'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors},_color_res.raw[1].thumbnail,
                     {'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors},_bovw_res.raw[1].thumbnail])    
         else:
+            logger.warning(color_res)
+            logger.warning(bovw_res)
             return BaseResponse(ACTION_FAILED, self._errors(color_res.status_code))
 
         #except Exception as e:
