@@ -11,10 +11,10 @@ from random import randint
 from re import search as re_search
 
 from nonebot.matcher import Matcher
-from nonebot import get_bot, on_command, require,get_driver
+from nonebot import get_bot, on_command, require, get_driver
 from nonebot.adapters.onebot.v11 import (MessageSegment, PokeNotifyEvent, escape,
-                                     unescape)
-from nonebot.adapters.onebot.v11.event import GroupMessageEvent, MessageEvent,Event
+                                         unescape)
+from nonebot.adapters.onebot.v11.event import GroupMessageEvent, MessageEvent, Event
 from nonebot.adapters.onebot.v11.message import Message
 from nonebot.adapters.onebot.v11.bot import Bot
 from nonebot.log import logger
@@ -83,7 +83,7 @@ class DB:
     """
 
     def __init__(self) -> None:
-        self.db:dict  # 本体
+        self.db: dict  # 本体
         self.db_keys: list = []
         self.type = _config["storage"]  # 存储类型, 'oss' or 'local'
         self.record_file = _config["database"]  # 记录文件路径
@@ -243,7 +243,7 @@ class DB:
 
         if _config['storage'] == 'local':
             value = "file:///" + value
-        return Response(ACTION_SUCCESS, message="Get a random picture.",content=(key, f"{value}"))
+        return Response(ACTION_SUCCESS, message="Get a random picture.", content=(key, f"{value}"))
 
     def get_picture_id(self, k):
         k = str(k)
@@ -329,7 +329,7 @@ async def upload_aqua(bot: Bot, event: MessageEvent):
         if len(images) == 0:
             images = args[1:]
             if len(images) == 0:
-                
+
                 return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("给点图?"))
             for image in images:
                 try:
@@ -358,19 +358,19 @@ async def upload_aqua(bot: Bot, event: MessageEvent):
                 await asyncio_sleep(0.5)
                 res = await saucenao_search(image, _config['saucenao_api'], "http://127.0.0.1:7890")
 
-                if res.status_code // 100 == 2:
-                    if res.content['index'] == "pixiv":
-                        logger.warning(res.content)
-                        _id = "pixiv_" + res.content['data']['illust_id'].__str__()
-                        _id_with_format = _id + '.jpeg'
-                        _response.content = f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
-                        if db.exist(_id_with_format):
-                            _response.content += f"{_id_with_format} 已经传过了"
-                            return await bot.send(event, MessageSegment.text(_response.content))
-                        else:
-                            await db.upload(image, _config['dir'], _id)
-                            _response.content += f"{_id_with_format} 上传成功"
-                            return await bot.send(event, MessageSegment.text(_response.content))
+                if res.status_code // 100 == 2 and res.content['index'] == "pixiv":
+                    logger.warning(res.content)
+                    _id = "pixiv_" + res.content['data']['illust_id'].__str__()
+                    _id_with_format = _id + '.jpeg'
+                    _response.content = f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
+                    if db.exist(_id_with_format):
+                        _response.content += f"{_id_with_format} 已经传过了"
+                        return await bot.send(event, MessageSegment.text(_response.content))
+                    else:
+                        await db.upload(image, _config['dir'], _id)
+                        _response.content += f"{_id_with_format} 上传成功"
+                        return await bot.send(event, MessageSegment.text(_response.content))
+
                 else:
                     _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
                     _id_with_format, _ = (await db.upload(image, _config['dir'], _id)).content
@@ -564,12 +564,12 @@ async def _search_handle(bot, event, image):
         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
     else:
         a = Ascii2D()
-        res:Response = await a.search(image)
+        res: Response = await a.search(image)
 
         if res.status_code // 100 == 2:
             _s = "\n".join([f"{k}: {v}"for k, v in res.content.items()])
-            return await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(_s))
-        elif res.status_code  == 300:
+            return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s))
+        elif res.status_code == 300:
             _s1 = "\n".join([f"{k}: {v}"for k, v in res.content[0].items()])
             _s2 = "\n".join([f"{k}: {v}"for k, v in res.content[2].items()])
             image1 = (await _safe_get_image(res.content[1], proxies="http://127.0.0.1:7890")).content
@@ -581,10 +581,9 @@ async def _search_handle(bot, event, image):
             image1 = (await _safe_get_image(res.content[1], proxies="http://127.0.0.1:7890")).content
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(_s1) + MessageSegment.image(image1))
 
-        elif res.status_code //100 == 4:
-                await bot.send(event,MessageSegment.reply(event.message_id)+MessageSegment.text(res.message))
-                await bot.send(event,MessageSegment.at(_config['superuser']))
-                
+        elif res.status_code // 100 == 4:
+            await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
+            await bot.send(event, MessageSegment.at(_config['superuser']))
 
         # await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
 
