@@ -158,3 +158,4 @@ src/plugins/aquabot/test.py
 settings.json
 .vscode/settings.json
 src/plugins/aquabot/testt.py
+.env.dev
