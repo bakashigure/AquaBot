@@ -9,31 +9,13 @@ Response=BaseResponse
 
 class Api():
     def __init__(self, refresh_token:str,**REQUEST_KWARGS):
-        self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS)
-        self.api.set_accept_language('zh_cn')
+        self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS) # app api
+        self.api.set_accept_language('zh-CN,zh;q=0.9')
         self.api.auth(refresh_token=refresh_token)
 
 
 
-"""
-class Api():
-    print("call api")
-    __instance = None
-    api = None
-    def __new__(cls, refresh_token,**_REQUESTS_KWARGS):
-        print("call new")
-        if cls.__instance is None:
-            print("call new instance")
-            cls.__instance = object.__new__(cls)
-            cls.api = pixivpy.AppPixivAPI(**_REQUESTS_KWARGS)
-            cls.api.set_accept_language("en_us") 
-            cls.api.auth(refresh_token=refresh_token)
-        return cls.__instance
-"""
-
-
-
-async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
+async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags','title_and_caption'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
     """对指定关键词搜索, 施加限定条件, 返回图片, 详见pixivpy3.search_illust  
     Args:    
     * ``refresh_token: str ``: pixiv登陆token  
@@ -94,6 +76,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
         return Response(ACTION_FAILED, message=f"{res.message}")
     else:
         return Response(ACTION_SUCCESS, content=(illust_list[index-1],res.content))
+
 
 async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -> Response:
     """

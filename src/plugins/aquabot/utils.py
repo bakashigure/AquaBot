@@ -1,3 +1,8 @@
+# @Author: bakashigure 
+# @Date: 2022-01-31 17:29:03 
+# @Last Modified by:   bakashigure 
+# @Last Modified time: 2022-01-31 17:29:03 
+
 """
 Define some functions for AquaBot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,8 +91,8 @@ def _tmp_fp()->str:
     return _config['cache'].__str__() + "/" + str(time()).replace(".", "") + ".jpg"
 
 def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
-    """接受一个图片, 将其转换为jpg, 大小不超过max_size,
-    过程中产生的临时文件存储于_config['cache']下
+    """接受一个图片, 将其转换为 `jpeg` , 大小不超过 `max_size`,
+    过程中产生的临时文件存储于 `_config['cache']` 下
 
     Args :
         * ``origin :str`` : 源图片目录
