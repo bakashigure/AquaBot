@@ -274,10 +274,10 @@ async def delete_aqua(bot: Bot, event: MessageEvent, image: str):
 
 
 @deleteMatcher.handle()
-async def _(match: Matcher, event: MessageEvent, args: Message = CommandArg()):
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     images = args.extract_plain_text().split()
     if images:
-        deleteMatcher.set_arg("images", images)
+        matcher.set_arg("images", images)
 
 
 @deleteMatcher.got("images", prompt="你想删什么图呢? 回复夸图`id`可查看这张图的id")
