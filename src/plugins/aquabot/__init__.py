@@ -133,6 +133,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
         event (Event): event
         id (str): pid
     """
+    logger.warning(args)
     if len(args) == 0:
         return await bot.send(event, "参 数 错 误")
     if len(args) == 1:  # pid
@@ -150,6 +151,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
     else:
         return await bot.send(event, "参 数 错 误")
 
+    logger.warning("pid: "+ pid + " size: " + size)
     resp = await get_pixiv_image_by_id(pid)
     if resp.status_code == ACTION_FAILED:
         await getIllustMatcher.finish("获取上游api失败")
@@ -173,24 +175,26 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
     for image in images:
         ret = await get_pixiv_image(image,"http://127.0.0.1:7890")
         if(ret.status_code == ACTION_SUCCESS):
-            await bot.send(event, ret.content)
+            await bot.send(event, MessageSegment.image(ret.content))
 
 
 @getIllustMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     args_list = args.extract_plain_text().split()
+    logger.warning("enter handle")
+    logger.warning(args_list)
     if args_list:
         matcher.set_arg("args_list", args_list)  # type: ignore
 
 @getIllustMatcher.got("args_list", prompt="参数来!")
-async def _(event: MessageEvent, args: list = Arg("arg_list")):
+async def _(event: MessageEvent, args: list = Arg("args_list")):
+    logger.warning("enter got")
+    logger.warning(args)
     if isinstance(args, Message):
         args = event.message.extract_plain_text().split()
     if not args:
         await getIllustMatcher.reject("参数来!")
     await get_illust_aqua(get_bot(), event, args)
-
-
 
 
 async def random_aqua(bot: Bot, event: Event):

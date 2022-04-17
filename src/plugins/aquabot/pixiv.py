@@ -2,6 +2,7 @@ import json
 import operator
 from typing import Literal
 import httpx
+from loguru import logger
 import pixivpy3 as pixivpy
 from .response import *
 from io import BytesIO
@@ -166,8 +167,10 @@ async def get_pixiv_image_by_id(id:str, proxy=None) -> Response:
         Response: 
     """
     url = "https://api.obfs.dev/api/pixiv/illust?id=" + id
+    logger.warning(url)
     async with httpx.AsyncClient(proxies=proxy) as client:
         res = await client.get(url, timeout=5)
-        if res.status_code == '200':
+        logger.warning(res)
+        if res.status_code == 200:
             return Response(ACTION_SUCCESS, content=json.loads(res.content))
-    return Response(ACTION_FAILED,message="请求上游api失败")
+        return Response(ACTION_FAILED,message="请求上游api失败")
