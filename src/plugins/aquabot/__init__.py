@@ -27,7 +27,7 @@ from soupsieve import match
 from .ascii2d import Ascii2D
 from .config import Config, _config
 from .db import DB
-from .pixiv import _safe_get_image, get_pixiv_image, get_pixiv_image_by_pid, pixiv_search
+from .pixiv import _safe_get_image, get_pixiv_image, get_pixiv_image_by_pid, pixiv_search, get_pixiv_image_by_id
 from .response import BaseResponse
 from .saucenao import saucenao_search
 from .text import text as _text
@@ -73,19 +73,20 @@ def record_id(k, v):
     return _record_id(db.messages, k, v)
 
 
-randomMatcher = on_command("aqua random", block=True, aliases={"来点夸图", "夸图来"},priority=7)
-moreMatcher = on_command("aqua more",block=True, aliases={"多来点夸图","来多点夸图"},priority=7)
-searchMatcher = on_command("aqua search", block=True,priority=7)
-pixivMatcher = on_command("aqua pixiv", block=True,priority=7)
-uploadMatcher = on_command("aqua upload", block=True,priority=7)
-helpMatcher = on_command("aqua help", block=True,priority=7)
-deleteMatcher = on_command("aqua delete", block=True,priority=7)
-statsMatcher = on_command("aqua stats", block=True,priority=7)
-deleteMatcher = on_command("aqua delete", block=True,priority=7)
-saveMatcher = on_command("aqua save", block=True,priority=7)
-reloadMatcher = on_command("aqua reload", block=True,priority=7)
+randomMatcher = on_command("aqua random", block=True, aliases={"来点夸图", "夸图来"}, priority=7)
+moreMatcher = on_command("aqua more", block=True, aliases={"多来点夸图", "来多点夸图"}, priority=7)
+searchMatcher = on_command("aqua search", block=True, priority=7)
+pixivMatcher = on_command("aqua pixiv", block=True, priority=7)
+uploadMatcher = on_command("aqua upload", block=True, priority=7)
+helpMatcher = on_command("aqua help", block=True, priority=7)
+deleteMatcher = on_command("aqua delete", block=True, priority=7)
+statsMatcher = on_command("aqua stats", block=True, priority=7)
+deleteMatcher = on_command("aqua delete", block=True, priority=7)
+saveMatcher = on_command("aqua save", block=True, priority=7)
+reloadMatcher = on_command("aqua reload", block=True, priority=7)
+getIllustMatcher = on_command("aqua illust", block=True, priority=7)
 
-replySearchMatcher = on_message(priority=8,block=True)
+replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
 
 
@@ -124,6 +125,72 @@ async def handle_first_receive(bot: Bot, event: Event):
 """
 
 
+async def get_illust_aqua(bot: Bot, event: Event, args: list):
+    """点图
+
+    Args:
+        bot (Bot): bot
+        event (Event): event
+        id (str): pid
+    """
+    if len(args) == 0:
+        return await bot.send(event, "参 数 错 误")
+    if len(args) == 1:  # pid
+        pid = args[0]
+        size = "large"
+        if not pid.isdigit():
+            return await bot.send(event, "pid必须为纯数字")
+    elif len(args) == 2:  # day 1 full | word day 1
+        pid = args[0]
+        if not pid.isdigit():
+            return await bot.send(event, "pid必须为纯数字")
+        size = args[1]
+        if size not in ["medium", "large", "original"]:
+            return await bot.send(event, "请选择['medium','large','original']中的一项")
+    else:
+        return await bot.send(event, "参 数 错 误")
+
+    resp = await get_pixiv_image_by_id(pid)
+    if resp.status_code == ACTION_FAILED:
+        await getIllustMatcher.finish("获取上游api失败")
+
+    d = resp.content
+    images = []
+    if "error" in d:
+        return await bot.send(event,"请求资源失败, "+d["error"]["user_message"])
+    else:
+        if d["illust"]["meta_single_page"]: # 判断单图还是图集
+            if size == 'original':
+                images.append(d["illust"]["meta_single_page"]["original_image_url"])
+            else:
+                images.append(d["illust"]["image_urls"][size])
+        else: # 图集
+            for image in d["illust"]["meta_pages"]:
+                images.append(image["image_urls"][size])
+    if(len(images) == 0):
+        return await bot.send(event, "请求资源失败")
+    
+    for image in images:
+        ret = await get_pixiv_image(image,"http://127.0.0.1:7890")
+        if(ret.status_code == ACTION_SUCCESS):
+            await bot.send(event, ret.content)
+
+@uploadMatcher.got("args_list", prompt="请提供一个pid哦")
+async def _(event: MessageEvent, args: list = Arg("arg_list")):
+    if isinstance(args, Message):
+        args = event.message.extract_plain_text().split()
+    if not args:
+        await getIllustMatcher.reject("参数来!")
+    await get_illust_aqua(get_bot(), event, args)
+
+
+@getIllustMatcher.handle()
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    args_list = args.extract_plain_text().split()
+    if args_list:
+        matcher.set_arg("args_list", args_list)
+
+
 async def random_aqua(bot: Bot, event: Event):
     """随机发送一张夸图
     Returns:
@@ -160,18 +227,17 @@ async def _(event: MessageEvent, images: str = ArgPlainText("images")):
         await random_aqua(get_bot(), event)
 
 
-
 async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
     """上传一张图片
     """
 
-    async def _up_user(): # 传未找到来源的图
+    async def _up_user():  # 传未找到来源的图
         _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
         _id_with_format, _ = (await db.upload(image, _config["dir"], _id)).content
         _response.content += f"{_id_with_format} 上传成功"
         return await bot.send(event, MessageSegment.text(_response.content))
 
-    async def _up_exist(): # 存在id的图
+    async def _up_exist():  # 存在id的图
         if db.exist(_id_with_format) or db.exist(_id):
             _response.content = "这张图已经被上传了"
             return await bot.send(
@@ -205,7 +271,7 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
             _user_id = str(event.user_id)[:4]  # 取用户qq前四位用作随机图片名上半段
             res = await saucenao_search(image, _config["saucenao_api"], "http://127.0.0.1:7890")
 
-            if res.status_code // 100 == 2: 
+            if res.status_code // 100 == 2:
                 if res.content["index"] == "pixiv":
                     logger.warning(res.content)
                     _id = "pixiv_" + res.content["data"]["illust_id"].__str__()
@@ -213,24 +279,24 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
                     _response.content = f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
                     await _up_exist()
                 elif res.content["index"] == "twitter":
-                    tweet_id = str(res.content["data"]["url"]).split('/')[-1]
+                    tweet_id = str(res.content["data"]["url"]).split("/")[-1]
                     _id = "twitter_" + tweet_id
-                    _id_with_format = _id+".jpeg"
+                    _id_with_format = _id + ".jpeg"
                     _response.content = f"发现twitter原图, illust_id: {tweet_id}\n"
                     logger.error(_id)
                     await _up_exist()
                 elif res.content["index"] == "danbooru":
                     if "twitter" in res.content["data"]["source"]:
-                        tweet_id = str(res.content["data"]["source"]).split('/')[-1]
+                        tweet_id = str(res.content["data"]["source"]).split("/")[-1]
                         _id = "twitter_" + tweet_id
-                        _id_with_format = _id+".jpeg"
+                        _id_with_format = _id + ".jpeg"
                         _response.content = f"发现twitter原图, illust_id: {tweet_id}\n"
                         logger.error(_id)
                         await _up_exist()
                     else:
                         await _up_user()
                 else:
-                    await _up_user()                
+                    await _up_user()
 
             else:
                 await _up_user()
@@ -323,19 +389,21 @@ async def func(bot: Bot, event: Event):
 async def help_aqua(bot: Bot, event: Event):
     return await bot.send(event, MessageSegment.text(_text["chinese"]["help"]))
 
+
 @helpMatcher.handle()
-async def _(matcher:Matcher, event:MessageEvent, args:Message = CommandArg()):
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     arg = args.extract_plain_text()
     if arg:
-        matcher.set_arg("arg",arg)
+        matcher.set_arg("arg", arg)
 
-@helpMatcher.got("arg",prompt=_text["chinese"]["help_simple"])
-async def _(event:MessageEvent, arg:str = Arg('arg')):
-    if isinstance(arg,Message):
+
+@helpMatcher.got("arg", prompt=_text["chinese"]["help_simple"])
+async def _(event: MessageEvent, arg: str = Arg("arg")):
+    if isinstance(arg, Message):
         arg = event.get_message().extract_plain_text()
-    if arg not in['random','more','help','pixiv','upload','stats','search','delete']:
-        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete']")
-    await helpMatcher.finish(MessageSegment.text(_text["chinese"]["help_"+arg]))
+    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust"]:
+        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust']")
+    await helpMatcher.finish(MessageSegment.text(_text["chinese"]["help_" + arg]))
 
 
 async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
@@ -350,21 +418,21 @@ async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
         await bot.send(event, MessageSegment.text(res.message))
 
 
-async def pixiv_aqua(bot: Bot, event: Event, args:list):
+async def pixiv_aqua(bot: Bot, event: Event, args: list):
     logger.warning(args)
 
     _full = False
 
-    if len(args) == 2: # day 1
-        dur,index = args
+    if len(args) == 2:  # day 1
+        dur, index = args
         word = "湊あくあ"
-    elif len(args) == 3: # day 1 full | word day 1
+    elif len(args) == 3:  # day 1 full | word day 1
         if args[-1] == "full":  # day 1 full
             word = "湊あくあ"
             dur, index, _full = args
         else:  # word day 1
             word, dur, index = args
-    elif len(args) == 4: # word day 1 full
+    elif len(args) == 4:  # word day 1 full
         word, dur, index, _full = args
     else:
         return await bot.send(event, MessageSegment.text("参 数 错 误"))
@@ -385,7 +453,7 @@ async def pixiv_aqua(bot: Bot, event: Event, args:list):
         refresh_token=_config["refresh_token"],
         word=word,
         search_target="partial_match_for_tags",
-        #search_target="title_and_caption",
+        # search_target="title_and_caption",
         sort="popular_desc",
         duration=dur,
         index=index,
@@ -395,21 +463,21 @@ async def pixiv_aqua(bot: Bot, event: Event, args:list):
     )
     await _pixiv_res_handle(bot, event, res)
 
-    
 
 @pixivMatcher.handle()
-async def _(matcher:Matcher,event:MessageEvent,args:Message = CommandArg()):
-    args_list = args.extract_plain_text().split( )
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    args_list = args.extract_plain_text().split()
     if args_list:
-        matcher.set_arg("args_list",args_list)
+        matcher.set_arg("args_list", args_list)
 
-@pixivMatcher.got("args_list",prompt="参数来!")
-async def _(event:MessageEvent, args:list=Arg("args_list")):
-    if isinstance(args,Message):
+
+@pixivMatcher.got("args_list", prompt="参数来!")
+async def _(event: MessageEvent, args: list = Arg("args_list")):
+    if isinstance(args, Message):
         args = event.message.extract_plain_text().split()
     if not args:
         pixivMatcher.reject("参数来!")
-    await pixiv_aqua(get_bot(),event,args)
+    await pixiv_aqua(get_bot(), event, args)
 
 
 @moreMatcher.handle()
@@ -426,6 +494,7 @@ async def more_aqua(bot: Bot, event: Event):
 
 async def reload_aqua():
     return db.reload()
+
 
 @reloadMatcher.handle()
 async def _():
@@ -452,8 +521,6 @@ async def _(bot: Bot, event: MessageEvent):
                     await _search_handle(image, event)
 
 
-
-
 @pokeMatcher.handle()
 async def _(bot: Bot, event: PokeNotifyEvent):
     if event.self_id == event.target_id:
@@ -477,9 +544,11 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 async def save_aqua(bot: Bot, event: Event):
     db.save()
 
+
 @saveMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     await save_aqua(get_bot(), event)
+
 
 @searchMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):

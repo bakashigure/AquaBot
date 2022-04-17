@@ -104,7 +104,6 @@ class DB:
     def reload(self) -> Response:
         """清空配置, 重新读取本地文件或oss.
         """
-        __builtins__
         self.db["oss"] = {}
         self.db["local"] = {}
         self.db["used"] = {}

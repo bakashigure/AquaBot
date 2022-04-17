@@ -1,4 +1,4 @@
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 text = dict()
 text["english"] = dict()
@@ -61,7 +61,8 @@ aqua more - 更多的夸图\n\
 aqua help - 使用 'aqua help `keyword`' 查看命令详细帮助\n\
 aqua upload [夸图] - 传图\n\
 aqua delete [夸图id] - 删图\n\
-aqua pixiv (可选关键词) [区间] [序号] (原图) - 爬图\n\
+aqua pixiv (可选关键词) [区间] [序号] ('full') - 爬图\n\
+aqua illust [pid] (可选尺寸)\n\
 aqua search [图] - 搜图\n\
 aqua stats - 现在有多少张夸图?\n\
 ————————\n\
@@ -113,6 +114,13 @@ pixiv搜图功能\n\
     示例:
     aqua pixiv day 1 -> 当日最热门的夸图
     aqua pixiv 天宮こころ month 1 full -> 当月最热门的阿喵喵原图
+"""
+
+text["chinese"][
+    "help_illust"
+] = f"""aqua illust [pid] (可选尺寸)\n\
+获取pid对应illust\n\
+尺寸: 可选尺寸, 可选值为'large','medium','original', 默认为'large'\n\
 """
 
 text["chinese"][
