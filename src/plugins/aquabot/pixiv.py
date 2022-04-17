@@ -1,3 +1,4 @@
+import json
 import operator
 from typing import Literal
 import httpx
@@ -153,3 +154,20 @@ async def get_pixiv_image(url: str, proxy=None) -> Response:
     """
     headers = {"Referer": "https://www.pixiv.net/"}
     return await _safe_get_image(url, headers, proxy)
+
+async def get_pixiv_image_by_id(id:str, proxy=None) -> Response:
+    """从hibiApi获取图片信息
+
+    Args:
+        id (str): pid
+        proxy (_type_, optional): 代理. Defaults to None.
+
+    Returns:
+        Response: 
+    """
+    url = "https://api.obfs.dev/api/pixiv/illust?id=" + id
+    async with httpx.AsyncClient(proxies=proxy) as client:
+        res = await client.get(url, timeout=5)
+        if res.status_code == '200':
+            return Response(ACTION_SUCCESS, content=json.loads(res.content))
+    return Response(ACTION_FAILED,message="请求上游api失败")
