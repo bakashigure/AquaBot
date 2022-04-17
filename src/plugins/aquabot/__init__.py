@@ -175,7 +175,14 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
         if(ret.status_code == ACTION_SUCCESS):
             await bot.send(event, ret.content)
 
-@getIllustMatcher.got("args_list", prompt="请提供一个pid哦")
+
+@getIllustMatcher.handle()
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    args_list = args.extract_plain_text().split()
+    if args_list:
+        matcher.set_arg("args_list", args_list)  # type: ignore
+
+@getIllustMatcher.got("args_list", prompt="参数来!")
 async def _(event: MessageEvent, args: list = Arg("arg_list")):
     if isinstance(args, Message):
         args = event.message.extract_plain_text().split()
@@ -184,11 +191,6 @@ async def _(event: MessageEvent, args: list = Arg("arg_list")):
     await get_illust_aqua(get_bot(), event, args)
 
 
-@getIllustMatcher.handle()
-async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-    args_list = args.extract_plain_text().split()
-    if args_list:
-        matcher.set_arg("args_list", args_list)
 
 
 async def random_aqua(bot: Bot, event: Event):
@@ -476,7 +478,7 @@ async def _(event: MessageEvent, args: list = Arg("args_list")):
     if isinstance(args, Message):
         args = event.message.extract_plain_text().split()
     if not args:
-        pixivMatcher.reject("参数来!")
+        await pixivMatcher.reject("参数来!")
     await pixiv_aqua(get_bot(), event, args)
 
 
