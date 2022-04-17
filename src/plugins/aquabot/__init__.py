@@ -175,7 +175,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
         if(ret.status_code == ACTION_SUCCESS):
             await bot.send(event, ret.content)
 
-@uploadMatcher.got("args_list", prompt="请提供一个pid哦")
+@getIllustMatcher.got("args_list", prompt="请提供一个pid哦")
 async def _(event: MessageEvent, args: list = Arg("arg_list")):
     if isinstance(args, Message):
         args = event.message.extract_plain_text().split()
