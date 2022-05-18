@@ -1,9 +1,6 @@
 __version__ = "2.4.0"
 
-text = dict()
-text["english"] = dict()
-text["chinese"] = dict()
-
+text = {"english": {}, "chinese": {}}
 # English config
 text["english"]["error_cqhttp_path_not_exist"] = ""
 text["english"]["error_path_not_exist"] = ""

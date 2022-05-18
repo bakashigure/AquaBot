@@ -52,7 +52,7 @@ class DB:
         self.db_keys: list = []
         self.type = _config["storage"]  # 存储类型, 'oss' or 'local'
         self.record_file = _config["database"]  # 记录文件路径
-        self.messages: typing.Dict[str, str] = dict()  # 记录bot发送的message_id与夸图id的键值对
+        self.messages: typing.Dict[str, str] = {}
 
         self.__version__ = "1.0.0"  # db version
 
@@ -72,7 +72,7 @@ class DB:
                 # print("DB: %s" % self.db)
 
         except FileNotFoundError:
-            logger.warning("record file not set, will create in %s" % self.record_file)
+            logger.warning(f"record file not set, will create in {self.record_file}")
             init_content = r' { "AquaBot": "this file created by aqua bot, please do not modify this file", "last_update":"", "records":"", "version":"", "total_count":0,"local":{}, "oss":{},"available_count":0,"available":{},"used_count":0,"used":{} }'
             with open(self.record_file, "w") as f:
                 f.write(init_content)
@@ -84,7 +84,7 @@ class DB:
             self.save()
 
         except JSONDecodeError as e:
-            logger.error("JSON decode error -> %s" % e)
+            logger.error(f"JSON decode error -> {e}")
             exit()
 
         self.refresh()
@@ -99,7 +99,9 @@ class DB:
         self.db["available_count"] = self.db["total_count"]
         self.db["used_count"] = 0
         self.last_update()
-        return Response(ACTION_SUCCESS, "refresh success, db_total:%s" % self.db["total_count"])
+        return Response(
+            ACTION_SUCCESS, f'refresh success, db_total:{self.db["total_count"]}'
+        )
 
     def reload(self) -> Response:
         """清空配置, 重新读取本地文件或oss.
@@ -123,7 +125,7 @@ class DB:
         """更新'last_update'字段
         """
         self.db["last_update"] = formatdate(usegmt=False)
-        return Response(ACTION_SUCCESS, "last_update: %s" % self.db["last_update"])
+        return Response(ACTION_SUCCESS, f'last_update: {self.db["last_update"]}')
 
     def save(self) -> Response:
         """保存数据库到本地文件
@@ -146,20 +148,20 @@ class DB:
             return res
 
     def add_record(self, k, v) -> Response:
-        if not k in self.db[self.type]:
+        if k not in self.db[self.type]:
             self.db["total_count"] += 1
         self.db[self.type][k] = v
-        return Response(ACTION_SUCCESS, "add_record record: %s -> %s" % (k, v))
+        return Response(ACTION_SUCCESS, f"add_record record: {k} -> {v}")
 
     async def delete(self, k: str) -> Response:
 
         try:
-            k = str(k)
+            k = k
             print(k)
             print(k in self.db[self.type])
             os_remove(self.db[self.type][k])
         except Exception as e:
-            return Response(ACTION_FAILED, f"图 片 不 存 在")
+            return Response(ACTION_FAILED, "图 片 不 存 在")
 
         try:
             del self.db[self.type][k]
@@ -201,7 +203,7 @@ class DB:
         self.db["available_count"] -= 1
 
         if _config["storage"] == "local":
-            value = "file:///" + value
+            value = f"file:///{value}"
         return Response(ACTION_SUCCESS, message="Get a random picture.", content=(key, f"{value}"))
 
     def get_picture_id(self, k):

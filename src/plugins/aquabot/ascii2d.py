@@ -61,7 +61,7 @@ class Ascii2DResponse:
 
     def __init__(self, resp):
         self.origin: list = resp
-        self.raw: list = list()
+        self.raw: list = []
 
         for ele in self.origin:
             detail = ele.contents
@@ -95,7 +95,7 @@ class Ascii2D:
             return "Source down"
         elif code == 302:
             return "Moved temporarily, or blocked by captcha"
-        elif code == 413 or code == 430:
+        elif code in [413, 430]:
             return "image too large"
         elif code == 400:
             return "Did you have upload the image ?, or wrong request syntax"
@@ -103,7 +103,7 @@ class Ascii2D:
             return "Forbidden,or token unvalid"
         elif code == 429:
             return "Too many request"
-        elif code == 500 or code == 503:
+        elif code in [500, 503]:
             return "Server error, or wrong picture format"
         else:
             return f"Unknown error{code}"
@@ -139,7 +139,7 @@ class Ascii2D:
         logger.warning(bovw_url)
 
         bovw_res = await client.get(bovw_url,follow_redirects=True)
-        await client.aclose() 
+        await client.aclose()
         #res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
         logger.info(f"color search: {color_res}")
         logger.info(f"bovw search: {bovw_res}")
@@ -150,19 +150,17 @@ class Ascii2D:
             _color_res =  self._slice(color_res.text)
             if _color_res.raw[0].title != "":
                 return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d color",{'index':"ascii2d", 'url': _color_res.raw[0].url, 'authors': _color_res.raw[0].authors})
-            else:
-                ret.status_code = ACTION_HALF_SUCCESS
-                ret.content.append({'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors})                    
-                ret.content.append(_color_res.raw[1].thumbnail)
+            ret.status_code = ACTION_HALF_SUCCESS
+            ret.content.append({'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors})
+            ret.content.append(_color_res.raw[1].thumbnail)
         if bovw_res.status_code == 200:
             _bovw_res = self._slice(bovw_res.text)
-            if _bovw_res.raw[0].title!="":
+            if _bovw_res.raw[0].title != "":
                 return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d bovw",{'index':"ascii2d", 'url': _bovw_res.raw[0].url, 'authors': _bovw_res.raw[0].authors})
-            else:
-                if ret.status_code == ACTION_HALF_SUCCESS:
-                    ret.status_code = ACTION_WARNING
-                ret.content.append({'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors})
-                ret.content.append(_bovw_res.raw[1].thumbnail)    
+            if ret.status_code == ACTION_HALF_SUCCESS:
+                ret.status_code = ACTION_WARNING
+            ret.content.append({'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors})
+            ret.content.append(_bovw_res.raw[1].thumbnail)    
 
         if ret.status_code == ACTION_FAILED:
             return BaseResponse(ACTION_FAILED,f"出错，颜色{color_res.status_code} 特征{bovw_res.status_code}")
