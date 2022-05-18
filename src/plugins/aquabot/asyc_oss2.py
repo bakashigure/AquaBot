@@ -51,30 +51,29 @@ class _Base():
         self.app_name = app_name
         self.enable_crc = enable_crc
 
-        self.prarms = dict()
+        self.prarms = {}
 
     def _make_signature(self, method, bucket, date, key) -> str:
-        if not bucket:
-            canonicalized_resource = '/' + key
-        else:
-            canonicalized_resource = '/' + bucket + '/' + key
+        canonicalized_resource = f'/{bucket}/{key}' if bucket else f'/{key}'
         content_type = 'text/html'
         VERB = method
         to_sign = "{0}\n\n\n{1}\n{2}".format(VERB, date, canonicalized_resource)
-        print("to_sign: %s" % to_sign)
+        print(f"to_sign: {to_sign}")
         _sig = hmac.new(to_bytes(self.auth.access_key_secret), to_bytes(to_sign), hashlib.sha1)
         signature = b64encode_as_string(_sig.digest())
-        Authorization = "OSS " + self.auth.access_key_id + ":" + signature
-        logger.info("Authorization: %s" % Authorization)
+        Authorization = f"OSS {self.auth.access_key_id}:{signature}"
+        logger.info(f"Authorization: {Authorization}")
 
         return Authorization
 
     def _make_headers(self, authorization, date):
-        _headers = dict()
-        _headers['authorization'] = authorization
-        _headers['date'] = date
-        _headers['User-Agent'] = user_agent
-        logger.info("headers: %s" % _headers)
+        _headers = {
+            'authorization': authorization,
+            'date': date,
+            'User-Agent': user_agent,
+        }
+
+        logger.info(f"headers: {_headers}")
         '''
         for k, v in kwargs.items():
             _headers[k.lower()] = v
@@ -83,7 +82,7 @@ class _Base():
 
     def _make_url(self, bucket_name: str, key=''):
         u = urlparse(self.endpoint)
-        return u.scheme + '://' + bucket_name + '.' + u.netloc + '/' + key
+        return f'{u.scheme}://{bucket_name}.{u.netloc}/{key}'
 
     async def do(self, method, bucket_name, key, **kwargs):
         url = self._make_url(bucket_name, key)
@@ -93,12 +92,12 @@ class _Base():
         headers = self._make_headers(authorization, req.date)
 
         async with httpx.AsyncClient() as client:
-            logger.info("kwargs: %s" % kwargs)
+            logger.info(f"kwargs: {kwargs}")
             request = httpx.Request(req.method, req.url, data=req.data, headers=headers)
             print(request)
             r = await client.send(request)
-            logger.info("status_code: %s" % r.status_code)
-            logger.info("content: %s" % r.content)
+            logger.info(f"status_code: {r.status_code}")
+            logger.info(f"content: {r.content}")
             return r
 
 
@@ -116,7 +115,7 @@ class Request():
         self.headers = params
         print('params', params)
 
-        sub_params = dict()
+        sub_params = {}
         if params:
             for k, v in params.items():
                 if (_k := k.lower()) in _subresource_key_set:
@@ -132,7 +131,7 @@ class Request():
         return formatdate(usegmt=True)
 
     def __param_to_query(self, k, v):
-        return k + '=' + v if v else k
+        return f'{k}={v}' if v else k
 
 
 def _convert_request_body(data):
@@ -238,7 +237,7 @@ class _BaseIterator():
         self.is_truncated = True
         self.next_marker = marker
 
-        max_retries = 3 if max_retries == None else max_retries
+        max_retries = 3 if max_retries is None else max_retries
         self.max_retries = max_retries if max_retries > 0 else 1
         self.entries = []
 
@@ -262,7 +261,7 @@ class _BaseIterator():
         return self.__next__()
 
     def fetch_with_retry(self):
-        for i in range(self.max_retries):
+        for _ in range(self.max_retries):
             try:
                 self.is_truncated, self.next_marker = self._fetch()
             except Exception as e:
@@ -324,10 +323,7 @@ class SimplifiedObjectInfo():
 
 def to_bytes(data):
     """若输入为str（即unicode），则转为utf-8编码的bytes；其他则原样返回"""
-    if isinstance(data, str):
-        return data.encode(encoding='utf-8')
-    else:
-        return data
+    return data.encode(encoding='utf-8') if isinstance(data, str) else data
 
 
 def b64encode_as_string(data):
@@ -336,10 +332,7 @@ def b64encode_as_string(data):
 
 def to_string(data):
     """若输入为bytes，则认为是utf-8编码，并返回str"""
-    if isinstance(data, bytes):
-        return data.decode('utf-8')
-    else:
-        return data
+    return data.decode('utf-8') if isinstance(data, bytes) else data
 
 
 async def main():

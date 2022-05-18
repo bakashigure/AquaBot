@@ -17,15 +17,9 @@ class Config(BaseSettings):
 global_config = nonebot.get_driver().config
 plugin_config = Config(**global_config.dict())
 
-_config = dict()  # 读取配置
-
 _help_url = "https://example.com"
 
-if global_config.aqua_bot_debug.lower() == "true":
-    _config["debug"] = True
-else:
-    _config["debug"] = False
-
+_config = {"debug": global_config.aqua_bot_debug.lower() == "true"}
 # proxy
 if len(global_config.aqua_bot_global_proxy) > 0:
     _config['proxy'] = global_config.aqua_bot_global_proxy
@@ -51,12 +45,12 @@ if _config['storage'] == "local":
     if _config['dir']:  # 是否配置存储路径
         dir_path = Path(_config['dir']).absolute()  # 获取绝对路径
         if not Path(dir_path).is_dir():
-            logger.error("路径%s不存在, 请手动创建" % dir_path)
+            logger.error(f"路径{dir_path}不存在, 请手动创建")
             exit()
         _config['dir'] = dir_path
     else:
         logger.warning("本地存储路径未配置, 默认存放于bot根目录下src/plugins/aquabot/img目录")
-        logger.warning("配置详见%s" % _help_url)
+        logger.warning(f"配置详见{_help_url}")
         _config['dir'] = "src/plugins/aquabot/img"
         _config['dir'] = Path(_config['dir']).absolute()
 elif _config['storage'] == "oss":
@@ -67,9 +61,8 @@ elif _config['storage'] == "oss":
     _config['bucket'] = global_config.aqua_bot_oss_bucket
     for k, v in _config.items():
         if v == "":
-            logger.error("您选择了%s的图片存储方式" % _config['storage'],)
-            logger.error(
-                "但 aqua_bot_oss_%s 未设置, 请检查.env文件, 配置详见 %s" % (k, _help_url))
+            logger.error(f"您选择了{_config['storage']}的图片存储方式")
+            logger.error(f"但 aqua_bot_oss_{k} 未设置, 请检查.env文件, 配置详见 {_help_url}")
             exit()
 
     # 暂时不打算再搞oss了(
@@ -97,7 +90,7 @@ elif _config['storage'] == "oss":
         """
 else:
     _help_url = ""
-    logger.error("存储方式不正确, 请检查.env文件, 有关配置详见%s " % _help_url)
+    logger.error(f"存储方式不正确, 请检查.env文件, 有关配置详见{_help_url} ")
     exit()
 
 # pixiv refresh_token 相关

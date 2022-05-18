@@ -134,7 +134,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
         id (str): pid
     """
     logger.warning(args)
-    if len(args) == 0:
+    if not args:
         return await bot.send(event, "参 数 错 误")
     if len(args) == 1:  # pid
         pid = args[0]
@@ -151,7 +151,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
     else:
         return await bot.send(event, "参 数 错 误")
 
-    logger.warning("pid: "+ pid + " size: " + size)
+    logger.warning(f"pid: {pid} size: {size}")
     resp = await get_pixiv_image_by_id(pid)
     if resp.status_code == ACTION_FAILED:
         await getIllustMatcher.finish("获取上游api失败")
@@ -160,18 +160,16 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
     images = []
     if "error" in d:
         return await bot.send(event,"请求资源失败, "+d["error"]["user_message"])
-    else:
-        if d["illust"]["meta_single_page"]: # 判断单图还是图集
-            if size == 'original':
-                images.append(d["illust"]["meta_single_page"]["original_image_url"])
-            else:
-                images.append(d["illust"]["image_urls"][size])
-        else: # 图集
-            for image in d["illust"]["meta_pages"]:
-                images.append(image["image_urls"][size])
-    if(len(images) == 0):
+    if d["illust"]["meta_single_page"]: # 判断单图还是图集
+        if size == 'original':
+            images.append(d["illust"]["meta_single_page"]["original_image_url"])
+        else:
+            images.append(d["illust"]["image_urls"][size])
+    else: # 图集
+        images.extend(image["image_urls"][size] for image in d["illust"]["meta_pages"])
+    if not images:
         return await bot.send(event, "请求资源失败")
-    
+
     for image in images:
         ret = await get_pixiv_image(image,"http://127.0.0.1:7890")
         if(ret.status_code == ACTION_SUCCESS):
@@ -226,7 +224,7 @@ async def _(event: MessageEvent, images: str = ArgPlainText("images")):
             await randomMatcher.finish(MessageSegment.text("请输入 [1, 5] 之间的数字"))
         if int(images) > 5:
             await randomMatcher.finish(MessageSegment.text("一次最多五张夸图哦"))
-        for __ in range(0, int(images)):
+        for __ in range(int(images)):
             await random_aqua(get_bot(), event)
             await asyncio_sleep(0.5)
     else:
@@ -238,7 +236,7 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
     """
 
     async def _up_user():  # 传未找到来源的图
-        _id = _user_id + "_" + str(randint(0, 10000000))  # 随便搞点随机数用作用户上传图片名下半段
+        _id = f"{_user_id}_{str(randint(0, 10000000))}"
         _id_with_format, _ = (await db.upload(image, _config["dir"], _id)).content
         _response.content += f"{_id_with_format} 上传成功"
         return await bot.send(event, MessageSegment.text(_response.content))
@@ -246,15 +244,13 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
     async def _up_exist():  # 存在id的图
         if db.exist(_id_with_format) or db.exist(_id):
             _response.content = "这张图已经被上传了"
-            return await bot.send(
-                event, MessageSegment.reply(event.message_id) + MessageSegment.text(_response.content)
-            )
         else:
             await db.upload(image, _config["dir"], _id)
             _response.content = f"{_id_with_format} 上传成功"
-            return await bot.send(
-                event, MessageSegment.reply(event.message_id) + MessageSegment.text(_response.content)
-            )
+
+        return await bot.send(
+            event, MessageSegment.reply(event.message_id) + MessageSegment.text(_response.content)
+        )
 
     _REQUESTS_KWARGS = {
         "proxies": {"https": "http://127.0.0.1:7890",},
@@ -313,10 +309,8 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
     images = await get_message_image(data=event.json(), type="file")
     if images:
         matcher.set_arg("images", images)
-    else:
-        pids = args.extract_plain_text().split()
-        if pids:
-            matcher.set_arg("images", pids)
+    elif pids := args.extract_plain_text().split():
+        matcher.set_arg("images", pids)
 
 
 @uploadMatcher.got("images", prompt="你想传什么夸图呢")
@@ -347,8 +341,7 @@ async def delete_aqua(bot: Bot, event: MessageEvent, image: str):
 
 @deleteMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-    images = args.extract_plain_text().split()
-    if images:
+    if images := args.extract_plain_text().split():
         matcher.set_arg("images", images)
 
 
@@ -398,8 +391,7 @@ async def help_aqua(bot: Bot, event: Event):
 
 @helpMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-    arg = args.extract_plain_text()
-    if arg:
+    if arg := args.extract_plain_text():
         matcher.set_arg("arg", arg)
 
 
@@ -409,7 +401,7 @@ async def _(event: MessageEvent, arg: str = Arg("arg")):
         arg = event.get_message().extract_plain_text()
     if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust"]:
         await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust']")
-    await helpMatcher.finish(MessageSegment.text(_text["chinese"]["help_" + arg]))
+    await helpMatcher.finish(MessageSegment.text(_text["chinese"][f"help_{arg}"]))
 
 
 async def _pixiv_res_handle(bot: Bot, event: Event, res: BaseResponse):
@@ -445,9 +437,7 @@ async def pixiv_aqua(bot: Bot, event: Event, args: list):
 
     if _full and _full == "full":
         _full = True
-    elif not _full:
-        pass
-    else:
+    elif _full:
         return await bot.send(event, MessageSegment.text("参 数 错 误"))
 
     word = word.replace("_", " ")
@@ -472,8 +462,7 @@ async def pixiv_aqua(bot: Bot, event: Event, args: list):
 
 @pixivMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-    args_list = args.extract_plain_text().split()
-    if args_list:
+    if args_list := args.extract_plain_text().split():
         matcher.set_arg("args_list", args_list)
 
 
@@ -509,30 +498,27 @@ async def _():
 
 @replySearchMatcher.handle()
 async def _(bot: Bot, event: MessageEvent):
-    r = re_search(r"\[CQ:reply,id=(-?\d*)]", event.raw_message)
-    if r:
-        if (event.self_id == event.reply.sender.user_id) and ("id" in event.get_plaintext()):
-            await bot.send(
-                event,
-                MessageSegment.reply(event.user_id) + MessageSegment.text(db.get_picture_id(event.reply.message_id)),
-            )
-        else:
-            if event.get_plaintext() in ["搜", "aquasearch", "aqua search", "search"]:
-                msg = await bot.get_msg(message_id=event.reply.message_id)
-                images = await get_message_image(msg, type="file")
-                if images:
-                    await bot.send(event, MessageSegment.text("正在搜"))
-                for image in images:
-                    print(f"image:{image}")
-                    await _search_handle(image, event)
+    if not (r := re_search(r"\[CQ:reply,id=(-?\d*)]", event.raw_message)):
+        return
+    if (event.self_id == event.reply.sender.user_id) and ("id" in event.get_plaintext()):
+        await bot.send(
+            event,
+            MessageSegment.reply(event.user_id) + MessageSegment.text(db.get_picture_id(event.reply.message_id)),
+        )
+    elif event.get_plaintext() in ["搜", "aquasearch", "aqua search", "search"]:
+        msg = await bot.get_msg(message_id=event.reply.message_id)
+        images = await get_message_image(msg, type="file")
+        if images:
+            await bot.send(event, MessageSegment.text("正在搜"))
+        for image in images:
+            print(f"image:{image}")
+            await _search_handle(image, event)
 
 
 @pokeMatcher.handle()
 async def _(bot: Bot, event: PokeNotifyEvent):
     if event.self_id == event.target_id:
         return await random_aqua(bot, event)
-    else:
-        pass
 
 
 async def stats_aqua(bot: Bot, event: Event):
