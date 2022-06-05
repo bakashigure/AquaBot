@@ -166,7 +166,7 @@ async def get_pixiv_image_by_id(id:str, proxy=None) -> Response:
     Returns:
         Response: 
     """
-    url = "https://api.obfs.dev/api/pixiv/illust?id=" + id
+    url = f"https://api.obfs.dev/api/pixiv/illust?id={id}"
     logger.warning(url)
     async with httpx.AsyncClient(proxies=proxy) as client:
         res = await client.get(url, timeout=5)
