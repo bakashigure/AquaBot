@@ -1,7 +1,7 @@
 {
     "python.pythonPath": "D:\\Anaconda3_2020_11\\envs\\Nonebot\\python.exe",
     "python.languageServer": "Pylance",
-    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.typeCheckingMode": "basic",
     "python.formatting.provider": "black",
     "python.formatting.blackArgs": [
         "--line-length",
