@@ -1,12 +1,20 @@
 # -*- coding:utf-8 -*-
 # Modified from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py 
 # Created by bakashigure
+from asyncio import sslproto
 from typing import Coroutine
 from bs4 import BeautifulSoup
 from loguru import logger
 from requests_toolbelt import MultipartEncoder
 import httpx 
 from .response import *
+import ssl
+
+def byPassCF():
+    ssl_context = httpx._config.SSLConfig().ssl_context
+    ssl_context.options &= ~ssl.OP_NO_TLSv1_3
+    return ssl_context
+
 
 class Ascii2DNorm:
     URL = 'https://ascii2d.net'
@@ -126,9 +134,12 @@ class Ascii2D:
         """
 
         files = {'file': ("img.png", open(url, 'rb'),"image/png")}
-        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890",follow_redirects=True)
+        print(url)
+        bypass = byPassCF()
+        headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"}
+        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890", follow_redirects=True, headers=headers, verify=bypass)
         try:
-            color_res = await client.post("https://ascii2d.net/search/multi", files=files)
+            color_res = await client.post("https://ascii2d.net/search/file", files=files)
         except httpx.ReadTimeout:
             await client.aclose()
             return BaseResponse(ACTION_FAILED,"timeout")
