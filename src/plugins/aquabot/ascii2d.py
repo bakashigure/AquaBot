@@ -162,7 +162,7 @@ class Ascii2D:
             if _color_res.raw[0].title != "":
                 return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d color",{'index':"ascii2d", 'url': _color_res.raw[0].url, 'authors': _color_res.raw[0].authors})
             ret.status_code = ACTION_HALF_SUCCESS
-            ret.content.append({'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors})
+            ret.content.append({'index':"ascii2d 颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors})
             ret.content.append(_color_res.raw[1].thumbnail)
         if bovw_res.status_code == 200:
             _bovw_res = self._slice(bovw_res.text)
@@ -170,11 +170,11 @@ class Ascii2D:
                 return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d bovw",{'index':"ascii2d", 'url': _bovw_res.raw[0].url, 'authors': _bovw_res.raw[0].authors})
             if ret.status_code == ACTION_HALF_SUCCESS:
                 ret.status_code = ACTION_WARNING
-            ret.content.append({'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors})
+            ret.content.append({'index':"ascii2d 特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors})
             ret.content.append(_bovw_res.raw[1].thumbnail)    
 
         if ret.status_code == ACTION_FAILED:
-            return BaseResponse(ACTION_FAILED,f"出错，颜色{color_res.status_code} 特征{bovw_res.status_code}")
+            return BaseResponse(ACTION_FAILED,f"ascii2d搜索出错，color_status_code:{color_res.status_code}  bovw_status_code:{bovw_res.status_code}")
         return ret
 
 

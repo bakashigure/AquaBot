@@ -600,7 +600,7 @@ async def _search_handle(image, event):
 
         elif res.status_code // 100 == 4:
             await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(res.message))
-            await bot.send(event, MessageSegment.at(_config["superuser"]))
+            # await bot.send(event, MessageSegment.at(_config["superuser"]))
 
 
 # 每日一夸
