@@ -111,3 +111,7 @@ if not _config['saucenao_api']:
 _config['language'] = global_config.aqua_bot_language
 if _config['language'] not in ['aqua', 'chinese', 'english', 'japanese']:
     logger.error("language设置不正确, 请检查.env文件")
+
+
+# gpt key
+_config['chatgpt_session_token'] = global_config.chatgpt_session_token

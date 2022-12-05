@@ -23,6 +23,7 @@ from nonebot.rule import to_me
 from PIL import Image
 from setuptools import Command
 from soupsieve import match
+from collections import defaultdict
 
 from .ascii2d import Ascii2D
 from .config import Config, _config
@@ -34,6 +35,7 @@ from .text import text as _text
 from .utils import ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING, get_message_image, get_path
 from .utils import record_id as _record_id
 from .utils import upload_to_local
+from .chatgpt import Chatbot
 
 logger.warning("importing AquaBot..")
 
@@ -50,9 +52,8 @@ logger.add("aqua.log")
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
-p = pathlib.Path("src/plugins/aquabot/database.json").resolve()
-logger.warning(p)
-
+chat = Chatbot()
+session = defaultdict(dict)
 
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
@@ -81,10 +82,10 @@ uploadMatcher = on_command("aqua upload", block=True, priority=7)
 helpMatcher = on_command("aqua help", block=True, priority=7)
 deleteMatcher = on_command("aqua delete", block=True, priority=7)
 statsMatcher = on_command("aqua stats", block=True, priority=7)
-deleteMatcher = on_command("aqua delete", block=True, priority=7)
 saveMatcher = on_command("aqua save", block=True, priority=7)
 reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
+chatMatcher = on_command("aqua chat", block=True, priority=7)
 
 replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
@@ -540,6 +541,30 @@ async def save_aqua(bot: Bot, event: Event):
 @saveMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     await save_aqua(get_bot(), event)
+
+async def chat_aqua(bot: Bot, event: Event, text:str):
+    session_id = event.get_session_id()
+    msg = await chat(**session[session_id]).get_chat_response(text, "http://127.0.0.1:7890")
+    await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(msg))
+    return
+    
+@scheduler.scheduled_job("interval", minutes=30)
+async def refresh_session() -> None:
+    await chat.refresh_session("http://127.0.0.1:7890")
+
+@chatMatcher.handle()
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    text = args.extract_plain_text()
+    if text:
+        matcher.set_arg("text", text)
+
+@chatMatcher.got("text", prompt="说点什么吧")
+async def _(event: MessageEvent, text: str = Arg("text")):
+    if isinstance(text, Message):
+        args = event.message.extract_plain_text()
+    if not text:
+        await pixivMatcher.reject("说点什么吧")
+    await chat_aqua(get_bot(), event, text)
 
 
 @searchMatcher.handle()

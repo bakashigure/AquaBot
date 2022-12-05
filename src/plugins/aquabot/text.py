@@ -1,4 +1,4 @@
-__version__ = "2.5.0"
+__version__ = "2.6.1"
 
 text = {"english": {}, "chinese": {}}
 # English config
@@ -42,6 +42,7 @@ aqua delete [夸图id] - 删除夸图\n\
 aqua pixiv (关键词) ['day','week','month'] [index] ('full') - 返回关键词在指定区间内最受欢迎的第index张图, 关键词中的空格请用下划线替代\n\
 aqua search [图] - 在saucenao和ascii2d中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
 aqua stats - 现在有多少张夸图?\n\
+aqua chat [句子] - 与 chatgpt 聊天\n\
 _____________________________________\n\
 aqua debug [cmd] - 执行内部同步命令, 并输出结果(可能) \n\
 aqua func [cmd] - 执行内部异步函数, 并输出结果(可能) \n\
@@ -62,6 +63,7 @@ aqua pixiv (可选关键词) [区间] [序号] ('full') - 爬图\n\
 aqua illust [pid] (可选尺寸)\n\
 aqua search [图] - 搜图\n\
 aqua stats - 现在有多少张夸图?\n\
+aqua chat [句子] - 与 chatgpt 聊天\n\
 ————————\n\
 提供`keyword`以查看命令详细帮助
 """
