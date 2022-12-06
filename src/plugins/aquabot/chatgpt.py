@@ -67,13 +67,13 @@ class Chatbot:
             await self.refresh_session(proxies=proxies)
         async with httpx.AsyncClient(proxies=proxies) as client:
             retry_times = 0
-            while retry_times < 3:
+            while retry_times < 2:
                 try:
                     response = await client.post(
                     "https://chat.openai.com/backend-api/conversation",
                     headers=self.headers,
                     json=self.get_payload(prompt),
-                    timeout=10,
+                    timeout=20,
                     )
                     response = response.text.splitlines()[-4]
                     response = response[6:]
