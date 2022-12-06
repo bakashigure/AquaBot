@@ -546,6 +546,7 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 @resetChatMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     id = event.user_id
+    bot = get_bot()
     del session[id]
     chat.reset_chat()
     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
