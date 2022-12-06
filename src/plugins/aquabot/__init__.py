@@ -544,7 +544,7 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
     await save_aqua(get_bot(), event)
 
 @resetChatMatcher.handle()
-async def _(matcher: Matcher, event: Message, args: Message = CommandArg()):
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     id = event.user_id
     del session[id]
     chat.reset_chat()
