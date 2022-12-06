@@ -2,6 +2,10 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
+
+src/plugins/aquabot/img
+
+
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -158,3 +162,4 @@ src/plugins/aquabot/test.py
 settings.json
 .vscode/settings.json
 src/plugins/aquabot/testt.py
+.env.*

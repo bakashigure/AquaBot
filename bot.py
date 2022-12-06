@@ -15,7 +15,7 @@ from nonebot.adapters.onebot.v11 import Adapter
 #            format=default_format)
 
 # You can pass some keyword args config to init function
-nonebot.init(_env_file=".env")
+nonebot.init()
 app = nonebot.get_asgi()
 
 driver = nonebot.get_driver()
@@ -33,5 +33,5 @@ nonebot.load_plugin("src.plugins.aquabot")
 # config = driver.config
 # do something...
 
-
-nonebot.run()
+if __name__ == "__main__":
+    nonebot.run(app="__mp_main__:app")

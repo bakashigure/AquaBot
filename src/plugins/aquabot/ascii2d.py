@@ -1,14 +1,20 @@
 # -*- coding:utf-8 -*-
 # Modified from https://github.com/kitUIN/PicImageSearch/blob/main/PicImageSearch/ascii2d.py 
 # Created by bakashigure
+from asyncio import sslproto
 from typing import Coroutine
 from bs4 import BeautifulSoup
 from loguru import logger
 from requests_toolbelt import MultipartEncoder
 import httpx 
-import aiofiles
-import asyncio
 from .response import *
+import ssl
+
+def byPassCF():
+    ssl_context = httpx._config.SSLConfig().ssl_context
+    ssl_context.options &= ~ssl.OP_NO_TLSv1_3
+    return ssl_context
+
 
 class Ascii2DNorm:
     URL = 'https://ascii2d.net'
@@ -63,7 +69,7 @@ class Ascii2DResponse:
 
     def __init__(self, resp):
         self.origin: list = resp
-        self.raw: list = list()
+        self.raw: list = []
 
         for ele in self.origin:
             detail = ele.contents
@@ -97,7 +103,7 @@ class Ascii2D:
             return "Source down"
         elif code == 302:
             return "Moved temporarily, or blocked by captcha"
-        elif code == 413 or code == 430:
+        elif code in [413, 430]:
             return "image too large"
         elif code == 400:
             return "Did you have upload the image ?, or wrong request syntax"
@@ -105,10 +111,10 @@ class Ascii2D:
             return "Forbidden,or token unvalid"
         elif code == 429:
             return "Too many request"
-        elif code == 500 or code == 503:
+        elif code in [500, 503]:
             return "Server error, or wrong picture format"
         else:
-            return "Unknown error, please report to the project maintainer"
+            return f"Unknown error{code}"
 
     async def search(self, url):
         """
@@ -128,9 +134,12 @@ class Ascii2D:
         """
 
         files = {'file': ("img.png", open(url, 'rb'),"image/png")}
-        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890",follow_redirects=True)
+        print(url)
+        bypass = byPassCF()
+        headers = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"}
+        client = httpx.AsyncClient(proxies="http://127.0.0.1:7890", follow_redirects=True, headers=headers, verify=bypass)
         try:
-            color_res = await client.post("https://ascii2d.net/search/multi", files=files)
+            color_res = await client.post("https://ascii2d.net/search/file", files=files)
         except httpx.ReadTimeout:
             await client.aclose()
             return BaseResponse(ACTION_FAILED,"timeout")
@@ -138,27 +147,36 @@ class Ascii2D:
             await client.aclose()
             return BaseResponse(ACTION_FAILED,"proxy error")
         bovw_url = color_res.url.__str__().replace("/color/","/bovw/")
-        bovw_res = await client.get(bovw_url)
-        await client.aclose() 
+        logger.warning(bovw_url)
+
+        bovw_res = await client.get(bovw_url,follow_redirects=True)
+        await client.aclose()
         #res = requests.post(ASCII2DURL, headers=headers, data=m, verify=False, **self.requests_kwargs)
-       
-        if color_res.status_code == 200 and bovw_res.status_code==200:
+        logger.info(f"color search: {color_res}")
+        logger.info(f"bovw search: {bovw_res}")
+        ret = BaseResponse(ACTION_FAILED,"get possible result from ascii2d",[])
+        if color_res.status_code == 200:
             # 处理逻辑： 先看第一个返回结果是否带上title，如果有说明这张图已经被搜索过了，有直接结果
             # 如果第一个结果的title为空，那么直接返回第二个结果，带上缩略图让用户自行比对是否一致
             _color_res =  self._slice(color_res.text)
-            _bovw_res = self._slice(bovw_res.text)
             if _color_res.raw[0].title != "":
-            #    return BaseResponse(ACTION_FAILED,"ascii2d not found.")
                 return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d color",{'index':"ascii2d", 'url': _color_res.raw[0].url, 'authors': _color_res.raw[0].authors})
-            else:
-                if _bovw_res.raw[0].title!="":
-                    return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d bovw",{'index':"ascii2d", 'url': _bovw_res.raw[0].url, 'authors': _bovw_res.raw[0].authors})
+            ret.status_code = ACTION_HALF_SUCCESS
+            ret.content.append({'index':"ascii2d 颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors})
+            ret.content.append(_color_res.raw[1].thumbnail)
+        if bovw_res.status_code == 200:
+            _bovw_res = self._slice(bovw_res.text)
+            if _bovw_res.raw[0].title != "":
+                return BaseResponse(ACTION_SUCCESS, "get direct result from ascii2d bovw",{'index':"ascii2d", 'url': _bovw_res.raw[0].url, 'authors': _bovw_res.raw[0].authors})
+            if ret.status_code == ACTION_HALF_SUCCESS:
+                ret.status_code = ACTION_WARNING
+            ret.content.append({'index':"ascii2d 特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors})
+            ret.content.append(_bovw_res.raw[1].thumbnail)    
 
-                return BaseResponse(ACTION_WARNING, "get possible result from ascii2d",[
-                    {'index':"ascii2d颜色检索",  'url': _color_res.raw[1].url, 'authors': _color_res.raw[1].authors},_color_res.raw[1].thumbnail,
-                    {'index':"ascii2d特征检索",  'url': _bovw_res.raw[1].url, 'authors': _bovw_res.raw[1].authors},_bovw_res.raw[1].thumbnail])    
-        else:
-            return BaseResponse(ACTION_FAILED, self._errors(color_res.status_code))
+        if ret.status_code == ACTION_FAILED:
+            return BaseResponse(ACTION_FAILED,f"ascii2d搜索出错，color_status_code:{color_res.status_code}  bovw_status_code:{bovw_res.status_code}")
+        return ret
+
 
         #except Exception as e:
         #    logger.error(e)

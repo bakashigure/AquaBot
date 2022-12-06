@@ -1,3 +1,8 @@
+# @Author: bakashigure 
+# @Date: 2022-01-31 17:29:03 
+# @Last Modified by:   bakashigure 
+# @Last Modified time: 2022-01-31 17:29:03 
+
 """
 Define some functions for AquaBot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -43,8 +48,7 @@ def _get_bot(bot_id):
     Returns :
         ``bot: nonebot.adapters.cqhttp.bot.Bot)`` :bot实例
     """
-    bot = nonebot.get_bots()[str(bot_id)]
-    return bot
+    return nonebot.get_bots()[str(bot_id)]
 
 
 
@@ -61,16 +65,13 @@ async def get_message_image(data, type: Literal["file", "url"]) -> list:
     """
     _img_list = []
     path = global_config.cqhttp
-    if isinstance(data,str):
-        _data = json.loads(data)
-    else:
-        _data = data
+    _data = json.loads(data) if isinstance(data,str) else data
     bot = nonebot.get_bot()
     for message in _data["message"]:
         if message["type"] == "image":
             if type == "file":
                 _file_detail = await bot.get_image(file=message["data"][type])
-                _path = path + "/" + str(_file_detail["file"])
+                _path = f"{path}/" + str(_file_detail["file"])
                 _img_list.append(_path)
             else:
                 _img_list.append(message["data"][type])
@@ -86,8 +87,8 @@ def _tmp_fp()->str:
     return _config['cache'].__str__() + "/" + str(time()).replace(".", "") + ".jpg"
 
 def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
-    """接受一个图片, 将其转换为jpg, 大小不超过max_size,
-    过程中产生的临时文件存储于_config['cache']下
+    """接受一个图片, 将其转换为 `jpeg` , 大小不超过 `max_size`,
+    过程中产生的临时文件存储于 `_config['cache']` 下
 
     Args :
         * ``origin :str`` : 源图片目录
@@ -103,20 +104,18 @@ def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     (x, y) = im.size
     if im.format == "gif":
         return im
-    else:
-        _tmp = _tmp_fp()
-        im.save(_tmp)
+    _tmp = _tmp_fp()
+    im.save(_tmp)
 
-        if getsize(_tmp) > _max_size:
-            while True:
-                _tmp = _tmp_fp()
-                (x, y) = (int(x * k), int(y * k))
-                _out = im.resize((x, y))
-                _out.save(_tmp)
-                _out.close()
-                if getsize(_tmp) < _max_size:
-                    return im
-        else:
+    if getsize(_tmp) <= _max_size:
+        return im
+    while True:
+        _tmp = _tmp_fp()
+        (x, y) = (int(x * k), int(y * k))
+        _out = im.resize((x, y))
+        _out.save(_tmp)
+        _out.close()
+        if getsize(_tmp) < _max_size:
             return im
 
 
@@ -133,14 +132,14 @@ async def _upload_custom(
     """
     if _config["storage"] == "local":
         _origin = resize_image(origin,max_size, 0.9)
-        _origin.save(target + "/" + target_filename)
+        _origin.save(f"{target}/{target_filename}")
         _origin.close()
 
     else:
         oss2.Bucket.put_object
         ...
 
-def upload_to_local(origin: Union[str,BytesIO], target: str, target_filename: str, max_size: int = 2048)->Response:
+def upload_to_local(origin: Union[str,BytesIO], target: str, target_filename: str, max_size: int = 2048) -> Response:
     """上传文件到本地
 
     Args :
@@ -153,22 +152,21 @@ def upload_to_local(origin: Union[str,BytesIO], target: str, target_filename: st
     logger.error(type(origin))
     if isinstance(origin, BytesIO):
         _origin = _tmp_fp()
-        _f = open(_origin, "wb")
-        logger.warning(type(origin))
-        logger.warning(type(_f))
-        _f.write(origin.getbuffer())
-        _f.close()
+        with open(_origin, "wb") as _f:
+            logger.warning(type(origin))
+            logger.warning(type(_f))
+            _f.write(origin.getbuffer())
     elif isinstance(origin, str):
         _origin = origin
     _origin = resize_image(_origin, max_size, 0.5)
     _format = 'gif' if _origin.format == 'gif' else 'jpeg'
-    target=str(target)
+    target = target
     logger.warning(f"target type: {type(target)}")
     logger.warning(f"target_filename type: {type(target_filename)}")
 
-    _target_with_path_format = target+'/'+target_filename+'.'+_format
-    _target_with_path = target+'/'+target_filename
-    _target_with_format = target_filename+'.'+_format
+    _target_with_path_format = f'{target}/{target_filename}.{_format}'
+    _target_with_path = f'{target}/{target_filename}'
+    _target_with_format = f'{target_filename}.{_format}'
     _origin.save(_target_with_path_format,format=_format)
     _origin.close()
     '''
@@ -193,7 +191,7 @@ async def _safe_send(id: int, api: str, **message):
     try:
         await bot.call_api(api, **message)
     except Exception as e:
-        logger.error("fail to send message, error %s" % e)
+        logger.error(f"fail to send message, error {e}")
 
 
 def get_path(path):

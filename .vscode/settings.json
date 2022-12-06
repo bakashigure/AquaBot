@@ -1,4 +1,13 @@
 {
     "python.pythonPath": "D:\\Anaconda3_2020_11\\envs\\Nonebot\\python.exe",
-    "python.formatting.provider": "autopep8"
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "120"
+    ],
+    "fileheader.Author": "bakashigure",
+    "fileheader.LastModifiedBy": "bakashigure",
+    "fileheader.tpl": "# @Author: {author} \r\n# @Date: {createTime} \r\n# @Last Modified by:   {lastModifiedBy} \r\n# @Last Modified time: {updateTime} \r\n"
 }
