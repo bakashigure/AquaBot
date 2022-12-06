@@ -552,8 +552,8 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 
 
 async def chat_aqua(bot: Bot, event: Event, text:str):
-    session_id = event.get_session_id()
-    msg = await chat(**session[session_id]).get_chat_response(text, "http://127.0.0.1:7890")
+    id = event.user_id
+    msg = await chat(**session[id]).get_chat_response(text, "http://127.0.0.1:7890")
     session[event.user_id]["conversation_id"] = chat.conversation_id
     session[event.user_id]["parent_id"] = chat.parent_id
 
