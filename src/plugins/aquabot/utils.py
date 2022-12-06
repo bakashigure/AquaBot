@@ -71,8 +71,7 @@ async def get_message_image(data, type: Literal["file", "url"]) -> list:
         if message["type"] == "image":
             if type == "file":
                 _file_detail = await bot.get_image(file=message["data"][type])
-                _path = f"{path}/" + str(_file_detail["file"])
-                _img_list.append(_path)
+                _img_list.append(f"{path}/" + str(_file_detail["file"]))
             else:
                 _img_list.append(message["data"][type])
 

@@ -137,9 +137,6 @@ class Request():
 def _convert_request_body(data):
     data = to_bytes(data)
 
-    if hasattr(data, '__len__'):
-        return data
-
     return data
 
 
@@ -211,17 +208,21 @@ class Bucket(_Base):
                               encoding_type='url',
                               max_keys=100
                               ):
-        resp = await self.do('GET', self.bucket_name, '',
-                             params={'list-type': '2',
-                                     'prefix': prefix,
-                                     'delimiter': delimiter,
-                                     'continuation-token': continuation_token,
-                                     'start-after': start_after,
-                                     'fetch-owner': str(fetch_owner).lower(),
-                                     'max-keys': str(max_keys),
-                                     'encoding-type': encoding_type}
-                             )
-        return resp
+        return await self.do(
+            'GET',
+            self.bucket_name,
+            '',
+            params={
+                'list-type': '2',
+                'prefix': prefix,
+                'delimiter': delimiter,
+                'continuation-token': continuation_token,
+                'start-after': start_after,
+                'fetch-owner': str(fetch_owner).lower(),
+                'max-keys': str(max_keys),
+                'encoding-type': encoding_type,
+            },
+        )
 
     '''
     async def append_object(): ...

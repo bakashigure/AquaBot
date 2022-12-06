@@ -41,7 +41,6 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None) -> Response:
     >>> Response.status = ACTION_FAILED
     >>> Response.message:str #错误信息
     """
-    bitmask_all = '999' #搜索saucenao全部index
     default_minsim = '75!' #最小匹配相似度
     _message = {}
     ImageFile.LOAD_TRUNCATED_IMAGES = True #qq有时候拿到的是烂图, 不完整的
@@ -52,13 +51,9 @@ async def saucenao_search(file_path: str, APIKEY: str, proxy=None) -> Response:
     imageData = io.BytesIO()
     image.save(imageData, format='PNG')
 
-    url_all = (
-        (
-            f'http://saucenao.com/search.php?output_type=2&numres=1&minsim={default_minsim}&db='
-            + bitmask_all
-        )
-        + '&api_key='
-    ) + APIKEY
+    bitmask_all = '999'
+    url_all = f'http://saucenao.com/search.php?output_type=2&numres=1&minsim={default_minsim}&db={bitmask_all}&api_key={APIKEY}'
+
 
     files = {'file': (file_path, imageData.getvalue())}
     imageData.close()

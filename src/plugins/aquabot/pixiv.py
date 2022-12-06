@@ -17,7 +17,7 @@ class Api():
 
 
 
-async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags','title_and_caption'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
+async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags','title_and_caption'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False) -> Response:
     """对指定关键词搜索, 施加限定条件, 返回图片, 详见pixivpy3.search_illust  
     Args:    
     * ``refresh_token: str ``: pixiv登陆token  
@@ -52,8 +52,8 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
         index=int(index)
     except ValueError:
         return Response(ACTION_FAILED, message = "Invalid index")
-        
-    duration = "within_last_" + duration
+
+    duration = f"within_last_{duration}"
     res_json = api.search_illust(word, search_target, sort, duration)
     #print(res_json)
     illust_list = []
@@ -64,7 +64,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
             origin = illust.meta_single_page["original_image_url"]
         else:
             origin = illust.meta_pages[0]["image_urls"]["original"] # 当图集时， 取图集的第一个
-    
+
         illust_list.append({"title":illust.title, "id":illust.id, "bookmark":int(illust.total_bookmarks), "large_url":illust.image_urls["large"], "origin":origin})
     illust_list.sort(key=operator.itemgetter("bookmark"), reverse=True)
     #illust_list = sorted([{"title": illust.title, "id": illust.id, "bookmark": int(illust.total_bookmarks), "large_url": illust.image_urls["large"],"origin": illust.meta_single_page["original_image_url"] if ("original_image_url" in illust['meta_single_page']) else illust.meta_single_page["origin_image_url"] } for illust in res_json.illusts],key=operator.itemgetter("bookmark"),reverse=True)
