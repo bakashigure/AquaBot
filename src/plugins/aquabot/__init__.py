@@ -86,6 +86,7 @@ saveMatcher = on_command("aqua save", block=True, priority=7)
 reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
 chatMatcher = on_command("aqua chat", block=True, priority=7)
+resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
 
 replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
@@ -542,9 +543,20 @@ async def save_aqua(bot: Bot, event: Event):
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     await save_aqua(get_bot(), event)
 
+@resetChatMatcher.handle()
+async def _(matcher: Matcher, event: Message, args: Message = CommandArg()):
+    id = event.user_id
+    del session[id]
+    chat.reset_chat()
+    await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
+
+
 async def chat_aqua(bot: Bot, event: Event, text:str):
     session_id = event.get_session_id()
     msg = await chat(**session[session_id]).get_chat_response(text, "http://127.0.0.1:7890")
+    session[event.user_id]["conversation_id"] = chat.conversation_id
+    session[event.user_id]["parent_id"] = chat.parent_id
+
     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(msg))
     return
     

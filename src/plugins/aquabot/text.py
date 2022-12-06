@@ -1,4 +1,4 @@
-__version__ = "2.6.1"
+__version__ = "2.7.2"
 
 text = {"english": {}, "chinese": {}}
 # English config
@@ -43,6 +43,7 @@ aqua pixiv (关键词) ['day','week','month'] [index] ('full') - 返回关键词
 aqua search [图] - 在saucenao和ascii2d中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
 aqua stats - 现在有多少张夸图?\n\
 aqua chat [句子] - 与 chatgpt 聊天\n\
+aqua resetchat - 重置与 chatgpt 的会话\n\
 _____________________________________\n\
 aqua debug [cmd] - 执行内部同步命令, 并输出结果(可能) \n\
 aqua func [cmd] - 执行内部异步函数, 并输出结果(可能) \n\
@@ -64,6 +65,7 @@ aqua illust [pid] (可选尺寸)\n\
 aqua search [图] - 搜图\n\
 aqua stats - 现在有多少张夸图?\n\
 aqua chat [句子] - 与 chatgpt 聊天\n\
+aqua resetchat - 重置 chatgpt 会话缓存\n\
 ————————\n\
 提供`keyword`以查看命令详细帮助
 """
@@ -133,4 +135,16 @@ text["chinese"][
 text['chinese']['help_stats'] = f'''aqua stats\n\
 目前的夸图统计
 '''
+
+text["chinese"][
+    "help_chat"
+] = f"""aqua chat [语句]\n\
+与 chatgpt 对话, 支持上下文\n\
+"""
+
+text["chinese"][
+    "help_resetchat"
+] = f"""aqua resetchat\n\
+重置与 chatgpt 的会话缓存\n\
+"""
 

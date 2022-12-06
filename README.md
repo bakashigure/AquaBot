@@ -1,4 +1,4 @@
-AquaBot 凑·阿库娅bot v2.6.1
+AquaBot 凑·阿库娅bot v2.7.2
 =========================
 此项目为基于nonebot2的bot，可以通过指令发夸图和上传夸图和其他的功能  
 属于几乎纯自用bot，所以你很可能部署不起来  
@@ -64,11 +64,16 @@ _____________________________________
 * aqua func [cmd] - 执行内部异步函数, 并输出结果(可能) 
 * aqua save - 保存当前夸图数据库到json 
 * aqua reload - 重新读取夸图列表 
-* aqua char [words] - 调用 chatgpt api 进行对话
+* aqua chat [words] - 调用 chatgpt api 进行对话
+* aqua resetchat - 重置当前用户的会话缓存
 TIP: 请注意指令间的空格
 ```
 ChangeLog
 =========================
+`2.7.2`
+* [+] 修复 chatgpt 接口的一些bug
+* [+] 支持 chatgpt 上下文
+
 `2.6.1`
 * [+] 接入 chatgpt api
 
