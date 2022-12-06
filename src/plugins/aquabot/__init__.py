@@ -8,6 +8,7 @@ import pathlib
 from asyncio import log, sleep as asyncio_sleep
 from random import randint, random
 from re import M, search as re_search
+import time
 
 from nonebot import get_bot, get_driver, on_command, require
 from nonebot.adapters import Message
@@ -35,6 +36,7 @@ from .text import text as _text
 from .utils import ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING, get_message_image, get_path
 from .utils import record_id as _record_id
 from .utils import upload_to_local
+from .utils import chat_cooldown_check
 from .chatgpt import Chatbot
 
 logger.warning("importing AquaBot..")
@@ -53,6 +55,7 @@ logger.add("aqua.log")
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
 chat = Chatbot()
+GLOBAL_CHAT_CD = 0
 session = defaultdict(dict)
 
 class Response(BaseResponse):
@@ -174,7 +177,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
 
     for image in images:
         ret = await get_pixiv_image(image,"http://127.0.0.1:7890")
-        if(ret.status_code == ACTION_SUCCESS):
+        if (ret.status_code == ACTION_SUCCESS):
             await bot.send(event, MessageSegment.image(ret.content))
 
 
@@ -547,12 +550,22 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     id = event.user_id
     bot = get_bot()
-    del session[id]
-    chat.reset_chat()
+    try:
+        del session[id]
+        chat.reset_chat()
+    except KeyError:
+        await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("无对话缓存, 无需刷新"))
+        return
     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
 
 
 async def chat_aqua(bot: Bot, event: Event, text:str):
+    global GLOBAL_CHAT_CD
+    if chat_cooldown_check(GLOBAL_CHAT_CD):
+        left = time.time() - GLOBAL_CHAT_CD
+        return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("chat冷却中, 下次使用前还需等待" + str(left) + "秒"))
+
+    GLOBAL_CHAT_CD = time.time()
     id = event.user_id
     msg = await chat(**session[id]).get_chat_response(text, "http://127.0.0.1:7890")
     session[event.user_id]["conversation_id"] = chat.conversation_id
