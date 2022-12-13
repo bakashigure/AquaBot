@@ -211,6 +211,6 @@ def chat_cooldown_check(chat_cd, cd_id):
     # get current seconds
     now = time.time()
     cd = _config["chat_cooldown"]
-    if cd_id in chat_cd and now - chat_cd[id] < cd:
+    if cd_id in chat_cd and now - chat_cd[cd_id] < cd:
         return True
     return False
