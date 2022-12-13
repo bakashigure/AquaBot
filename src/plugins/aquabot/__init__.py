@@ -56,7 +56,7 @@ logger.add("aqua.log")
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
 chat = Chatbot(token=_config['chatgpt_session_token'], proxies = "http://127.0.0.1:7890")
-chat_cd = defaultdict(dict)
+chat_cd = defaultdict(int)
 session = defaultdict(dict)
 
 class Response(BaseResponse):
@@ -569,7 +569,6 @@ async def chat_aqua(bot: Bot, event: Event, text:str):
         left = int(time.time()) - chat_cd[cd_id]
         return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("chat 冷却中, 下次使用前还需等待" + str(left) + "秒"))
 
-    GLOBAL_CHAT_CD = time.time()
     id = event.user_id
     msg = await chat(**session[id]).get_chat_response(text)
     session[event.user_id]["conversation_id"] = chat.conversation_id

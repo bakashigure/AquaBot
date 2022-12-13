@@ -19,7 +19,7 @@ from nonebot.adapters.onebot.v11 import message
 import oss2
 import httpx
 from .config import _config
-from time import time
+import time
 from os.path import getsize
 from .response import *
 
