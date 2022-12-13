@@ -56,8 +56,8 @@ class Chatbot:
     def __call__(
         self, conversation_id: Optional[str] = None, parent_id: Optional[str] = None
     ) -> Self:
-        self.conversation_id = conversation_id[-1] if conversation_id else None
-        self.parent_id = parent_id[-1] if parent_id else self.id
+        self.conversation_id = conversation_id
+        self.parent_id = parent_id or self.id
         return self
 
     @property
@@ -76,7 +76,7 @@ class Chatbot:
             "Connection": "close",
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://chat.openai.com/chat",
-        } 
+        }
 
     def get_payload(self, prompt: str) -> Dict[str, Any]:
         return {
@@ -94,8 +94,13 @@ class Chatbot:
         }
 
     async def get_chat_response(self, prompt: str) -> str:
-        if not self.authorization:
-            await self.refresh_session()
+        for i in range(2):
+            if not self.authorization:
+                await self.refresh_session()
+            else:
+                break
+        else:
+            return "获取session失败，请检查后台报错"
         cookies = {SESSION_TOKEN_KEY: self.session_token}
         if self.cf_clearance:
             cookies[CF_CLEARANCE_KEY] = self.cf_clearance
@@ -154,6 +159,7 @@ class Chatbot:
                     response.cookies.get(SESSION_TOKEN_KEY) or self.session_token
                 )
                 self.authorization = response.json()["accessToken"]
+                logger.debug("刷新会话成功: " + self.session_token + self.cf_clearance)
             except Exception as e:
                 logger.opt(colors=True, exception=e).error(
                     f"刷新会话失败: <r>HTTP{response.status_code}</r> {escape_tag(response.text)}"
@@ -189,29 +195,42 @@ class Chatbot:
     async def get_cf_cookies(self) -> None:
         logger.debug("正在获取cf cookies")
         async with async_playwright() as p:
-            browser = await p.firefox.launch(
-                headless=True,
-                args=[
-                    "--disable-extensions",
-                    "--disable-application-cache",
-                    "--disable-gpu",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--incognito",
-                ],
-                proxy={"server": self.proxies} if self.proxies else None,  # your proxy
-            )
+            try:
+                browser = await p.firefox.launch(
+                    headless=True,
+                    args=[
+                        "--disable-extensions",
+                        "--disable-application-cache",
+                        "--disable-gpu",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--incognito",
+                    ],
+                    proxy={"server": self.proxies}
+                    if self.proxies
+                    else None,  # your proxy
+                )
+            except Exception as e:
+                logger.opt(exception=e).error(
+                    "playwright未安装，请先在shell中运行playwright install"
+                )
             ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/{browser.version}"
             content = await browser.new_context(user_agent=ua)
             page = await content.new_page()
             await page.add_init_script(js)
-            try:
-                await page.goto("https://chat.openai.com/chat")
+            cf_clearance = None
+            await page.goto("https://chat.openai.com/chat")
+            for j in range(6):
+                if cf_clearance:
+                    break
                 await asyncio.sleep(5)
                 cookies = await content.cookies()
-            except:
-                logger.error("cf cookies获取失败")
-            cf_clearance = next(filter(lambda x: x["name"] == "cf_clearance", cookies))
+                for i in cookies:
+                    if i["name"] == "cf_clearance":
+                        cf_clearance = i
+                        break
+            else:
+                logger.error("cf cookies获取失败，可能遇到了人工校验")
             self.cf_clearance = cf_clearance["value"]
             self.user_agent = ua
             await page.close()
