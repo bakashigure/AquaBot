@@ -54,8 +54,8 @@ logger.add("aqua.log")
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
-chat = Chatbot()
-GLOBAL_CHAT_CD = 0
+chat = Chatbot(token=_config['chatgpt_session_token'], proxies = "http://127.0.0.1:7890")
+chat_cd = defaultdict(dict)
 session = defaultdict(dict)
 
 class Response(BaseResponse):
@@ -552,7 +552,6 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
     bot = get_bot()
     try:
         del session[id]
-        chat.reset_chat()
     except KeyError:
         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("无对话缓存, 无需刷新"))
         return
@@ -560,14 +559,18 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 
 
 async def chat_aqua(bot: Bot, event: Event, text:str):
-    global GLOBAL_CHAT_CD
-    if chat_cooldown_check(GLOBAL_CHAT_CD):
-        left = time.time() - GLOBAL_CHAT_CD
-        return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("chat冷却中, 下次使用前还需等待" + str(left) + "秒"))
+    global chat_cd
+    if event.message_type == 'group':
+        cd_id = event.group_id
+    else:
+        cd_id = event.user_id
+    if chat_cooldown_check(chat_cd, cd_id):
+        left = int(time.time()) - chat_cd[cd_id]
+        return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("chat 冷却中, 下次使用前还需等待" + str(left) + "秒"))
 
     GLOBAL_CHAT_CD = time.time()
     id = event.user_id
-    msg = await chat(**session[id]).get_chat_response(text, "http://127.0.0.1:7890")
+    msg = await chat(**session[id]).get_chat_response(text)
     session[event.user_id]["conversation_id"] = chat.conversation_id
     session[event.user_id]["parent_id"] = chat.parent_id
 
@@ -576,7 +579,7 @@ async def chat_aqua(bot: Bot, event: Event, text:str):
     
 @scheduler.scheduled_job("interval", minutes=30)
 async def refresh_session() -> None:
-    await chat.refresh_session("http://127.0.0.1:7890")
+    await chat.refresh_session()
 
 @chatMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
