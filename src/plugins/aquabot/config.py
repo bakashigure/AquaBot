@@ -116,3 +116,5 @@ if _config['language'] not in ['aqua', 'chinese', 'english', 'japanese']:
 # gpt key
 _config['chatgpt_session_token'] = global_config.chatgpt_session_token
 _config['chat_cooldown'] = global_config.chat_cooldown
+_config['chatgpt_account'] = global_config.chatgpt_account
+_config['chatgpt_password'] = global_config.chatgpt_password

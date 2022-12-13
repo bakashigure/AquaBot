@@ -55,7 +55,7 @@ logger.add("aqua.log")
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
 
-chat = Chatbot(token=_config['chatgpt_session_token'], proxies = "http://127.0.0.1:7890")
+chat = Chatbot(account = _config['chatgpt_account'], password = _config['chatgpt_password'] ,proxies = "http://127.0.0.1:7890")
 chat_cd = defaultdict(int)
 session = defaultdict(dict)
 
