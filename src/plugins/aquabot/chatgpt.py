@@ -105,13 +105,18 @@ class Chatbot:
         if self.cf_clearance:
             cookies[CF_CLEARANCE_KEY] = self.cf_clearance
         async with httpx.AsyncClient(proxies=self.proxies) as client:
-            response = await client.post(
-                urljoin(self.api_url, "backend-api/conversation"),
-                headers=self.headers,
-                cookies=cookies,
-                json=self.get_payload(prompt),
-                timeout=self.timeout,
-            )
+            try:
+                response = await client.post(
+                    urljoin(self.api_url, "backend-api/conversation"),
+                    headers=self.headers,
+                    cookies=cookies,
+                    json=self.get_payload(prompt),
+                    timeout=self.timeout,
+                )
+            except httpx.ReadTimeout:
+                return "kale, timeout, 等等再试"
+            except httpx.RemoteProtocolError:
+                return "kale, 在接受返回内容时连接中断"
         if response.status_code == 429:
             return "请求过多，请放慢速度"
         if response.status_code == 401:
