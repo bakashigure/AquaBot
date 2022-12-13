@@ -210,7 +210,7 @@ def record_id(d:dict,k:Union[dict,str],v:Any):
 def chat_cooldown_check(chat_cd, cd_id):
     # get current seconds
     now = time.time()
-    cd = _config["chat_cool_down"]
+    cd = _config["chat_cooldown"]
     if id in chat_cd and now - chat_cd[id] < cd:
         return True
     chat_cd[id] = now
