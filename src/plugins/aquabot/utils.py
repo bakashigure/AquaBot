@@ -213,5 +213,4 @@ def chat_cooldown_check(chat_cd, cd_id):
     cd = _config["chat_cooldown"]
     if id in chat_cd and now - chat_cd[id] < cd:
         return True
-    chat_cd[id] = now
     return False
