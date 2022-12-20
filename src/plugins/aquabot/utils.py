@@ -84,7 +84,7 @@ def _clear_cache():
     ...
 
 def _tmp_fp()->str:
-    return _config['cache'].__str__() + "/" + str(time()).replace(".", "") + ".jpg"
+    return _config['cache'].__str__() + "/" + str(time.time()).replace(".", "") + ".jpg"
 
 def resize_image(origin: str, max_size: int, k: float) -> Image.Image:
     """接受一个图片, 将其转换为 `jpeg` , 大小不超过 `max_size`,
