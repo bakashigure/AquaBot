@@ -1,27 +1,23 @@
 # Code from https://github.com/A-kirami/nonebot-plugin-chatgpt/blob/master/nonebot_plugin_chatgpt/chatgpt.py
 
 import uuid
-import httpx
-import asyncio
+from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
-from nonebot.log import logger
-from typing_extensions import Self
-from nonebot.exception import NetworkError
-from urllib.parse import urljoin
-from playwright.async_api import async_playwright
-from .config import Config, _config
-from nonebot.utils import escape_tag, run_sync
 
+from nonebot import get_driver
+from nonebot.log import logger
+from nonebot.utils import escape_tag
+from playwright.async_api import Page, Route, async_playwright
+from typing_extensions import Self
+
+driver = get_driver()
 try:
     import ujson as json
 except ModuleNotFoundError:
     import json
 
 
-js = "Object.defineProperties(navigator, {webdriver:{get:()=>undefined}});"
-
 SESSION_TOKEN_KEY = "__Secure-next-auth.session-token"
-CF_CLEARANCE_KEY = "cf_clearance"
 
 
 class Chatbot:
@@ -41,11 +37,11 @@ class Chatbot:
         self.api_url = api
         self.proxies = proxies
         self.timeout = timeout
-        self.authorization = ""
-
-        self.cf_clearance = ""
-        self.user_agent = ""
-
+        self.content = None
+        self.parent_id = None
+        self.conversation_id = None
+        self.browser = None
+        self.playwright = async_playwright()
         if self.session_token:
             self.auto_auth = False
         elif self.account and self.password:
@@ -53,30 +49,52 @@ class Chatbot:
         else:
             raise ValueError("至少需要配置 session_token 或者 account 和 password")
 
+    async def playwright_start(self):
+        """启动浏览器，在插件开始运行时调用"""
+        playwright = await self.playwright.start()
+        try:
+            self.browser = await playwright.firefox.launch(
+                headless=True,
+                proxy={"server": self.proxies} if self.proxies else None,  # your proxy
+            )
+        except Exception as e:
+            logger.opt(exception=e).error("playwright未安装，请先在shell中运行playwright install")
+            return
+        ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/{self.browser.version}"
+        self.content = await self.browser.new_context(user_agent=ua)
+        await self.set_cookie(self.session_token)
+
+    async def set_cookie(self, session_token: str):
+        """设置session_token"""
+        self.session_token = session_token
+        await self.content.add_cookies(
+            [
+                {
+                    "name": SESSION_TOKEN_KEY,
+                    "value": session_token,
+                    "domain": "chat.openai.com",
+                    "path": "/",
+                }
+            ]
+        )
+
+    @driver.on_shutdown
+    async def playwright_close(self):
+        """关闭浏览器"""
+        await self.content.close()
+        await self.browser.close()
+        await self.playwright.__aexit__()
+
     def __call__(
         self, conversation_id: Optional[str] = None, parent_id: Optional[str] = None
     ) -> Self:
-        self.conversation_id = conversation_id
-        self.parent_id = parent_id or self.id
+        self.conversation_id = conversation_id[-1] if conversation_id else None
+        self.parent_id = parent_id[-1] if parent_id else self.id
         return self
 
     @property
     def id(self) -> str:
         return str(uuid.uuid4())
-
-    @property
-    def headers(self) -> Dict[str, str]:
-        return {
-            "Host": "chat.openai.com",
-            "Accept": "text/event-stream",
-            "Authorization": f"Bearer {self.authorization}",
-            "Content-Type": "application/json",
-            "User-Agent": self.user_agent,
-            "X-Openai-Assistant-App-Id": "",
-            "Connection": "close",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://chat.openai.com/chat",
-        }
 
     def get_payload(self, prompt: str) -> Dict[str, Any]:
         return {
@@ -93,47 +111,75 @@ class Chatbot:
             "model": "text-davinci-002-render",
         }
 
+    @asynccontextmanager
+    async def get_page(self):
+        """打开网页，这是一个异步上下文管理器，使用async with调用"""
+        page = await self.content.new_page()
+        js = "Object.defineProperties(navigator, {webdriver:{get:()=>undefined}});"
+        await page.add_init_script(js)
+        await page.goto("https://chat.openai.com/chat")
+        yield page
+        await page.close()
+
     async def get_chat_response(self, prompt: str) -> str:
-        for i in range(2):
-            if not self.authorization:
-                await self.refresh_session()
-            else:
-                break
-        else:
-            return "获取session失败，请检查后台报错"
-        cookies = {SESSION_TOKEN_KEY: self.session_token}
-        if self.cf_clearance:
-            cookies[CF_CLEARANCE_KEY] = self.cf_clearance
-        async with httpx.AsyncClient(proxies=self.proxies) as client:
-            try:
-                response = await client.post(
-                    urljoin(self.api_url, "backend-api/conversation"),
-                    headers=self.headers,
-                    cookies=cookies,
-                    json=self.get_payload(prompt),
-                    timeout=self.timeout,
+        async with self.get_page() as page:
+            await page.wait_for_load_state("domcontentloaded")
+            if not await page.locator("text=OpenAI Discord").is_visible():
+                await self.get_cf_cookies(page)
+            logger.debug("正在发送请求")
+
+            async def change_json(route: Route):
+                await route.continue_(
+                    post_data=json.dumps(self.get_payload(prompt)),
                 )
-            except httpx.ReadTimeout:
-                return "kale, timeout, 等等再试"
-            except httpx.RemoteProtocolError:
-                return "kale, 在接受返回内容时连接中断"
-        if response.status_code == 429:
-            return "请求过多，请放慢速度"
-        if response.status_code == 401:
-            return "token失效，请重新设置token"
-        if response.status_code == 403:
-            await self.get_cf_cookies()
-            return await self.get_chat_response(prompt)
-        if response.is_error:
-            logger.opt(colors=True).error(
-                f"非预期的响应内容: <r>HTTP{response.status_code}</r> {escape_tag(response.text)}"
+
+            await self.content.route(
+                "https://chat.openai.com/backend-api/conversation", change_json
             )
-            return f"ChatGPT 服务器返回了非预期的内容: HTTP{response.status_code}\n{response.text}"
-        lines = response.text.splitlines()
-        data = lines[-4][6:]
-        response = json.loads(data)
-        self.parent_id = response["message"]["id"]
-        self.conversation_id = response["conversation_id"]
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_load_state("networkidle")
+            session_expired = page.locator("button", has_text="Log in")
+            if await session_expired.is_visible():
+                logger.debug("检测到session过期")
+                return "token失效，请重新设置token"
+            next_botton = page.locator(
+                ".btn.flex.justify-center.gap-2.btn-neutral.ml-auto"
+            )
+            if await next_botton.is_visible():
+                logger.debug("检测到初次打开弹窗")
+                await next_botton.click()
+                await next_botton.click()
+                await page.click(".btn.flex.justify-center.gap-2.btn-primary.ml-auto")
+            async with page.expect_response(
+                "https://chat.openai.com/backend-api/conversation",
+                timeout=self.timeout * 1000,
+            ) as response_info:
+                textarea = page.locator("textarea")
+                botton = page.locator("button").last
+                logger.debug("正在等待回复")
+                for _ in range(3):
+                    await textarea.fill(prompt)
+                    await page.wait_for_timeout(500)
+                    if await botton.is_enabled():
+                        await botton.click()
+            response = await response_info.value
+            if response.status == 429:
+                return "请求过多，请放慢速度"
+            if response.status == 403:
+                await self.get_cf_cookies(page)
+                return await self.get_chat_response(prompt)
+            if response.status != 200:
+                logger.opt(colors=True).error(
+                    f"非预期的响应内容: <r>HTTP{response.status}</r> {escape_tag(response.text)}"
+                )
+                return f"ChatGPT 服务器返回了非预期的内容: HTTP{response.status}\n{response.text}"
+            lines = await response.text()
+            lines = lines.splitlines()
+            data = lines[-4][6:]
+            response = json.loads(data)
+            self.parent_id = response["message"]["id"]
+            self.conversation_id = response["conversation_id"]
+            logger.debug("发送请求结束")
         return response["message"]["content"]["parts"][0]
 
     async def refresh_session(self) -> None:
@@ -141,37 +187,21 @@ class Chatbot:
         if self.auto_auth:
             await self.login()
         else:
-            cookies = {SESSION_TOKEN_KEY: self.session_token}
-            if self.cf_clearance:
-                cookies[CF_CLEARANCE_KEY] = self.cf_clearance
-            async with httpx.AsyncClient(
-                cookies=cookies,
-                proxies=self.proxies,
-                timeout=self.timeout,
-            ) as client:
-                response = await client.get(
-                    urljoin(self.api_url, "api/auth/session"),
-                    headers={
-                        "User-Agent": self.user_agent,
-                    },
-                )
-            try:
-                if response.status_code == 403:
-                    await self.get_cf_cookies()
-                    await self.refresh_session()
-                    return
-                self.session_token = (
-                    response.cookies.get(SESSION_TOKEN_KEY) or self.session_token
-                )
-                self.authorization = response.json()["accessToken"]
-                logger.debug("刷新会话成功: " + self.session_token + self.cf_clearance)
-            except Exception as e:
-                logger.opt(colors=True, exception=e).error(
-                    f"刷新会话失败: <r>HTTP{response.status_code}</r> {escape_tag(response.text)}"
-                )
+            async with self.get_page() as page:
+                if not await page.locator("text=OpenAI Discord").is_visible():
+                    await self.get_cf_cookies(page)
+                await page.wait_for_load_state("domcontentloaded")
+                session_expired = page.locator("text=Your session has expired")
+                if await session_expired.count():
+                    logger.opt(colors=True).error("刷新会话失败, session token 已过期, 请重新设置")
+            cookies = await self.content.cookies()
+            for i in cookies:
+                if i["name"] == SESSION_TOKEN_KEY:
+                    self.session_token = i["value"]
+                    break
+            logger.debug("刷新会话成功")
 
-    @run_sync
-    def login(self) -> None:
+    async def login(self) -> None:
         from OpenAIAuth.OpenAIAuth import OpenAIAuth
 
         auth = OpenAIAuth(self.account, self.password, bool(self.proxies), self.proxies)  # type: ignore
@@ -183,62 +213,33 @@ class Chatbot:
             raise e
         if not auth.access_token:
             logger.error("ChatGPT 登陆错误!")
-        self.authorization = auth.access_token
         if auth.session_token:
-            self.session_token = auth.session_token
+            await self.set_cookie(auth.session_token)
         elif possible_tokens := auth.session.cookies.get(SESSION_TOKEN_KEY):
             if len(possible_tokens) > 1:
-                self.session_token = possible_tokens[0]
+                await self.set_cookie(possible_tokens[0])
             else:
                 try:
-                    self.session_token = possible_tokens
+                    await self.set_cookie(possible_tokens)
                 except Exception as e:
                     logger.opt(exception=e).error("ChatGPT 登陆错误!")
         else:
             logger.error("ChatGPT 登陆错误!")
 
-    async def get_cf_cookies(self) -> None:
+    @staticmethod
+    async def get_cf_cookies(page: Page) -> None:
         logger.debug("正在获取cf cookies")
-        async with async_playwright() as p:
-            try:
-                browser = await p.firefox.launch(
-                    headless=True,
-                    args=[
-                        "--disable-extensions",
-                        "--disable-application-cache",
-                        "--disable-gpu",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--incognito",
-                    ],
-                    proxy={"server": self.proxies}
-                    if self.proxies
-                    else None,  # your proxy
-                )
-            except Exception as e:
-                logger.opt(exception=e).error(
-                    "playwright未安装，请先在shell中运行playwright install"
-                )
-            ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/{browser.version}"
-            content = await browser.new_context(user_agent=ua)
-            page = await content.new_page()
-            await page.add_init_script(js)
-            cf_clearance = None
-            await page.goto("https://chat.openai.com/chat")
-            for j in range(6):
-                if cf_clearance:
-                    break
-                await asyncio.sleep(5)
-                cookies = await content.cookies()
-                for i in cookies:
-                    if i["name"] == "cf_clearance":
-                        cf_clearance = i
-                        break
-            else:
-                logger.error("cf cookies获取失败，可能遇到了人工校验")
-            self.cf_clearance = cf_clearance["value"]
-            self.user_agent = ua
-            await page.close()
-            await content.close()
-            await browser.close()
+        for _ in range(20):
+            button = page.get_by_role("button", name="Verify you are human")
+            if await button.count():
+                await button.click()
+            label = page.locator("label span")
+            if await label.count():
+                await label.click()
+            await page.wait_for_timeout(1000)
+            cf = page.locator("text=OpenAI Discord")
+            if await cf.is_visible():
+                break
+        else:
+            logger.error("cf cookies获取失败")
         logger.debug("cf cookies获取成功")
