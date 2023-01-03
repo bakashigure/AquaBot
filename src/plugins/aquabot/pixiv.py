@@ -12,7 +12,7 @@ Response=BaseResponse
 class Api():
     def __init__(self, refresh_token:str,**REQUEST_KWARGS):
         self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS) # app api
-        self.api.set_accept_language('zh-CN,zh;q=0.9')
+        self.api.set_accept_language('zh-cn')
         self.api.auth(refresh_token=refresh_token)
 
 
