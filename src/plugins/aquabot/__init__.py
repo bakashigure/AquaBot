@@ -50,7 +50,7 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
-ChatBot = ChatBot(organization = _config["openai_organization"], api_key=_config["openai_api_key"], max_token=_config["openai_max_token"], enable_cd = True, proxy_url="127.0.0.1:7890")
+ChatBot = ChatBot(organization = _config["openai_organization"], api_key=_config["openai_api_key"], max_token=_config["openai_max_token"], enable_cd = True, proxy_url="http://127.0.0.1:7890")
 
 logger.add("aqua.log", rotation="00:00") # split by day
 
