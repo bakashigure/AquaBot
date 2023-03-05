@@ -37,8 +37,7 @@ from .text import text as _text
 from .utils import ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING, get_message_image, get_path
 from .utils import record_id as _record_id
 from .utils import upload_to_local
-# from .utils import chat_cooldown_check
-# from .chatgpt import Chatbot
+from .chatgpt import ChatBot
 
 logger.warning("importing AquaBot..")
 
@@ -51,13 +50,11 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
-logger.add("aqua.log")
+ChatBot = ChatBot(organization = _config["openai_organization"], api_key=_config["openai_api_key"], max_token=_config["openai_max_token"], enable_cd = True)
+
+logger.add("aqua.log", rotation="00:00") # split by day
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
-
-# chat = Chatbot(token = _config['chatgpt_session_token'], timeout = 20)
-# chat_cd = defaultdict()
-# session = defaultdict(dict)
 
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
@@ -89,7 +86,7 @@ statsMatcher = on_command("aqua stats", block=True, priority=7)
 saveMatcher = on_command("aqua save", block=True, priority=7)
 reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
-# chatMatcher = on_command("aqua chat", block=True, priority=7)
+chatMatcher = on_command("aqua chat", block=True, priority=7)
 # resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
 
 replySearchMatcher = on_message(priority=8, block=True)
@@ -405,8 +402,8 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 async def _(event: MessageEvent, arg: str = Arg("arg")):
     if isinstance(arg, Message):
         arg = event.get_message().extract_plain_text()
-    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust"]:
-        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust']")
+    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust", "chat", "reset_chat"]:
+        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust','chat','reset_chat']")
     await helpMatcher.finish(MessageSegment.text(_text["chinese"][f"help_{arg}"]))
 
 
@@ -559,41 +556,26 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 #     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
 
 
-# async def chat_aqua(bot: Bot, event: Event, text:str):
-#     if event.message_type == 'group':
-#         cd_id = event.group_id
-#     else:
-#         cd_id = event.user_id
-#     print('cd_id:', cd_id)
-#     if chat_cooldown_check(chat_cd, cd_id):
-#         left = int(time.time() - chat_cd[cd_id])
-#         return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("chat 冷却中, 下次使用前还需等待约" + str(left) + "秒"))
-#     chat_cd[cd_id] = time.time()
-#     id = event.user_id
-#     msg = await chat(**session[id]).get_chat_response(text)
-#     session[event.user_id]["conversation_id"] = chat.conversation_id
-#     session[event.user_id]["parent_id"] = chat.parent_id
+async def chat_aqua(bot: Bot, event: Event, text:str):
+    cd_id = event.user_id
+    resp = ChatBot.chat(cd_id, text)
 
-#     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(msg))
-#     return
+    return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(resp.message))
     
-# @scheduler.scheduled_job("interval", minutes=30)
-# async def refresh_session() -> None:
-#     await chat.refresh_session()
 
-# @chatMatcher.handle()
-# async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-#     text = args.extract_plain_text()
-#     if text:
-#         matcher.set_arg("text", text)
+@chatMatcher.handle()
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    text = args.extract_plain_text()
+    if text:
+        matcher.set_arg("text", text)
 
-# @chatMatcher.got("text", prompt="说点什么吧")
-# async def _(event: MessageEvent, text: str = Arg("text")):
-#     if isinstance(text, Message):
-#         args = event.message.extract_plain_text()
-#     if not text:
-#         await pixivMatcher.reject("说点什么吧")
-#     await chat_aqua(get_bot(), event, text)
+@chatMatcher.got("text", prompt="说点什么吧")
+async def _(event: MessageEvent, text: str = Arg("text")):
+    if isinstance(text, Message):
+        args = event.message.extract_plain_text()
+    if not text:
+        await pixivMatcher.reject("说点什么吧")
+    await chat_aqua(get_bot(), event, text)
 
 
 @searchMatcher.handle()

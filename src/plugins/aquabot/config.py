@@ -113,8 +113,7 @@ if _config['language'] not in ['aqua', 'chinese', 'english', 'japanese']:
     logger.error("language设置不正确, 请检查.env文件")
 
 
-# gpt key
-_config['chatgpt_session_token'] = global_config.chatgpt_session_token
-_config['chat_cooldown'] = global_config.chat_cooldown
-_config['chatgpt_account'] = global_config.chatgpt_account
-_config['chatgpt_password'] = global_config.chatgpt_password
+# openai key
+_config["openai_organization"] = global_config.aqua_bot_openai_organization
+_config["openai_api_key"] = global_config.aqua_bot_openai_api_key
+_config["openai_max_token"] = global_config.aqua_bot_openai_max_token

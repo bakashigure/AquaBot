@@ -11,7 +11,7 @@ Define some functions for AquaBot
 from io import BytesIO
 from pathlib import Path
 import json
-from typing import Literal,Union
+from typing import Dict, Literal,Union
 import nonebot
 from nonebot.log import logger
 from PIL import Image
@@ -207,10 +207,35 @@ def record_id(d:dict,k:Union[dict,str],v:Any):
     v=str(v)
     d[k] = v
 
-def chat_cooldown_check(chat_cd, cd_id):
-    # get current seconds
-    now = time.time()
-    cd = _config["chat_cooldown"]
-    if cd_id in chat_cd and now - chat_cd[cd_id] < cd:
-        return True
+def Singleton(cls):
+    """Singleton decorator
+
+    Args :
+        * ``cls (object)`` : class to decorate
+
+    Returns :
+        * ``object`` : decorated class
+    """
+    def wrapper(*args, **kwargs):
+        if not hasattr(cls, '__instance'):
+            setattr(cls, '__instance', cls(*args, **kwargs))
+        return getattr(cls, '__instance')
+    return wrapper
+
+
+
+def builtin_cd(data:Dict[int, int], id: int, cd: int) -> bool:
+    """检查是否在冷却中
+
+    Args :
+        * ``data (dict)`` : 冷却数据
+        * ``id (int|str)`` : 用户id
+        * ``cd (int)`` : 冷却时间
+
+    Returns :
+        * ``bool`` : 是否在冷却中
+    """
+    if id in data:
+        if time.time() - data[id] < cd:
+            return True
     return False

@@ -6,15 +6,23 @@ from loguru import logger
 import pixivpy3 as pixivpy
 from .response import *
 from io import BytesIO
+from .utils import Singleton
+import time
 
 Response=BaseResponse
 
+@Singleton
 class Api():
-    def __init__(self, refresh_token:str,**REQUEST_KWARGS):
-        self.api = pixivpy.AppPixivAPI(**REQUEST_KWARGS) # app api
-        self.api.set_accept_language('zh-cn')
-        self.api.auth(refresh_token=refresh_token)
+    def __init__(self, refresh_token:str, **REQUEST_KWARGS):
+        self.__api = pixivpy.AppPixivAPI(**REQUEST_KWARGS) # app api
+        self.__api.set_accept_language('zh-cn')
+        self.refresh_token = refresh_token
 
+    def get_api(self):
+        if not self.last_refresh_time or time.time() - self.last_refresh_time > 3600:
+            self.__api.auth(refresh_token=self.refresh_token)
+            self.last_refresh_time = time.time()
+        return self.__api
 
 
 async def pixiv_search(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags','title_and_caption'], sort:str, duration:str,index,_REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
@@ -44,7 +52,7 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
     """
     
 
-    api = Api(refresh_token,**_REQUESTS_KWARGS).api
+    api = Api(refresh_token,**_REQUESTS_KWARGS).get_api()
 
     if duration not in ["day", "week", "month"]:    
         return Response(ACTION_FAILED, message = "Invalid duration")
@@ -79,6 +87,11 @@ async def pixiv_search(refresh_token:str, word:str, search_target:Literal['parti
     else:
         return Response(ACTION_SUCCESS, content=(illust_list[index-1],res.content))
 
+async def pixiv_search2(refresh_token:str, word:str, search_target:Literal['partial_match_for_tags','exact_match_for_tags','title_and_caption'], sort:str, duration:str, _REQUESTS_KWARGS=None,proxy=None,full=False)->Response:
+    """对关键词的最相近词(related_tags)进行搜索"""
+    
+    
+    ...
 
 async def _safe_get_image(url: str, headers: dict = None, proxies: str = None) -> Response:
     """
