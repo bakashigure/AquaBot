@@ -16,6 +16,7 @@ class ChatBot:
         max_token: int,
         enable_cd: bool = True,
         cd_function: Optional[Callable] = None,
+        proxy_url = None
     ):
         self._organization = organization
         self._api_key = api_key
@@ -25,6 +26,11 @@ class ChatBot:
 
         openai.organization = self._organization
         openai.api_key = self._api_key
+        if proxy_url:
+            openai.proxy = {
+                'http': proxy_url,
+                'https': proxy_url,
+            }
         
         if enable_cd:
             self._cd_function = cd_function if callable(cd_function) else builtin_cd
