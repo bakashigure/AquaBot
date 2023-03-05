@@ -269,7 +269,7 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
             await bot.send(event, MessageSegment.text("\n".join([f"{k}: {v}" for k, v in res.items()])))
             await bot.send(event, MessageSegment.image(image))
             _id = "pixiv_" + res["id"].__str__()
-            _id_with_format = _id + ".jpeg"
+            _id_with_format = f"{_id}.jpeg"
             await _up_exist()
 
         else:
@@ -280,21 +280,21 @@ async def upload_aqua(bot: Bot, event: MessageEvent, image: str):
                 if res.content["index"] == "pixiv":
                     logger.warning(res.content)
                     _id = "pixiv_" + res.content["data"]["illust_id"].__str__()
-                    _id_with_format = _id + ".jpeg"
+                    _id_with_format = f"{_id}.jpeg"
                     _response.content = f"发现pixiv原图, illust_id: {res.content['data']['illust_id'].__str__()}\n"
                     await _up_exist()
                 elif res.content["index"] == "twitter":
                     tweet_id = str(res.content["data"]["url"]).split("/")[-1]
-                    _id = "twitter_" + tweet_id
-                    _id_with_format = _id + ".jpeg"
+                    _id = f"twitter_{tweet_id}"
+                    _id_with_format = f"{_id}.jpeg"
                     _response.content = f"发现twitter原图, illust_id: {tweet_id}\n"
                     logger.error(_id)
                     await _up_exist()
                 elif res.content["index"] == "danbooru":
                     if "twitter" in res.content["data"]["source"]:
                         tweet_id = str(res.content["data"]["source"]).split("/")[-1]
-                        _id = "twitter_" + tweet_id
-                        _id_with_format = _id + ".jpeg"
+                        _id = f"twitter_{tweet_id}"
+                        _id_with_format = f"{_id}.jpeg"
                         _response.content = f"发现twitter原图, illust_id: {tweet_id}\n"
                         logger.error(_id)
                         await _up_exist()
@@ -565,8 +565,7 @@ async def chat_aqua(bot: Bot, event: Event, text:str):
 
 @chatMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-    text = args.extract_plain_text()
-    if text:
+    if text := args.extract_plain_text():
         matcher.set_arg("text", text)
 
 @chatMatcher.got("text", prompt="说点什么吧")

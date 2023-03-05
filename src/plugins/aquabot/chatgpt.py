@@ -57,5 +57,5 @@ class ChatBot:
             return Response(status_code=ACTION_SUCCESS, message=text)
         except Exception as e:
             print(e)
-            return Response(status_code=ACTION_FAILED, message="aqua chat 发生错误: " + str(e))
+            return Response(status_code=ACTION_FAILED, message=f"aqua chat 发生错误: {str(e)}")
         
