@@ -36,7 +36,7 @@ class ChatBot:
             self._cd_function = cd_function if callable(cd_function) else builtin_cd
             self._cd_data = {}
 
-    def chat(self, id: int, message: str) -> Response:
+    async def chat(self, id: int, message: str) -> Response:
         try:
             if self._enable_cd:
                 cd = 10
@@ -45,7 +45,7 @@ class ChatBot:
                 else:
                     self._cd_data[id] = time.time()
 
-            rep = openai.ChatCompletion.create(
+            rep = await openai.ChatCompletion.acreate(
                 model = self._model_name,
                 messages = [
                     {"role": "user", "content": message}

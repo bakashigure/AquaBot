@@ -558,7 +558,7 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 
 async def chat_aqua(bot: Bot, event: Event, text:str):
     cd_id = event.user_id
-    resp = ChatBot.chat(cd_id, text)
+    resp = await ChatBot.chat(cd_id, text)
 
     return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(resp.message))
     
