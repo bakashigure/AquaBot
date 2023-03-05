@@ -1,4 +1,4 @@
-__version__ = "2.6.1"
+__version__ = "2.8.0"
 
 text = {"english": {}, "chinese": {}}
 # English config
@@ -42,7 +42,8 @@ aqua delete [夸图id] - 删除夸图\n\
 aqua pixiv (关键词) ['day','week','month'] [index] ('full') - 返回关键词在指定区间内最受欢迎的第index张图, 关键词中的空格请用下划线替代\n\
 aqua search [图] - 在saucenao和ascii2d中搜索这张图(支持多张), 支持来源twitter, pixiv...\n\
 aqua stats - 现在有多少张夸图?\n\
-aqua chat [句子] - 与 chatgpt 聊天\n\
+aqua chat*功能未开启* [句子] - 与 chatgpt 聊天\n\
+aqua resetchat*功能未开启* - 重置与 chatgpt 的会话\n\
 _____________________________________\n\
 aqua debug [cmd] - 执行内部同步命令, 并输出结果(可能) \n\
 aqua func [cmd] - 执行内部异步函数, 并输出结果(可能) \n\
@@ -63,7 +64,8 @@ aqua pixiv (可选关键词) [区间] [序号] ('full') - 爬图\n\
 aqua illust [pid] (可选尺寸)\n\
 aqua search [图] - 搜图\n\
 aqua stats - 现在有多少张夸图?\n\
-aqua chat [句子] - 与 chatgpt 聊天\n\
+aqua chat [句子] - 与 gpt-3.5-turbo-0301 聊天\n\
+aqua resetchat*功能未开启* - 重置 chatgpt 会话缓存\n\
 ————————\n\
 提供`keyword`以查看命令详细帮助
 """
@@ -133,4 +135,16 @@ text["chinese"][
 text['chinese']['help_stats'] = f'''aqua stats\n\
 目前的夸图统计
 '''
+
+text["chinese"][
+    "help_chat"
+] = f"""aqua chat [语句]\n\
+与 gpt-3.5-turbo-0301 对话, 不支持上下文, 单次对话token限制400, 对话频率限制10s\n\
+"""
+
+text["chinese"][
+    "help_resetchat"
+] = f"""aqua resetchat\n\
+重置与 chatgpt 的会话缓存\n\
+"""
 

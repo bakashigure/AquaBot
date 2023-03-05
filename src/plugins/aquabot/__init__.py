@@ -5,9 +5,11 @@
 
 from ast import alias
 import pathlib
+import time
 from asyncio import log, sleep as asyncio_sleep
 from random import randint, random
 from re import M, search as re_search
+import time
 
 from nonebot import get_bot, get_driver, on_command, require
 from nonebot.adapters import Message
@@ -35,7 +37,7 @@ from .text import text as _text
 from .utils import ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING, get_message_image, get_path
 from .utils import record_id as _record_id
 from .utils import upload_to_local
-from .chatgpt import Chatbot
+from .chatgpt import ChatBot
 
 logger.warning("importing AquaBot..")
 
@@ -48,12 +50,11 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
-logger.add("aqua.log")
+ChatBot = ChatBot(organization = _config["openai_organization"], api_key=_config["openai_api_key"], max_token=_config["openai_max_token"], enable_cd = True, proxy_url="http://127.0.0.1:7890")
+
+logger.add("aqua.log", rotation="00:00") # split by day
 
 scheduler = require("nonebot_plugin_apscheduler").scheduler
-
-chat = Chatbot()
-session = defaultdict(dict)
 
 class Response(BaseResponse):
     def __init__(self, *args, **kwargs):
@@ -86,6 +87,7 @@ saveMatcher = on_command("aqua save", block=True, priority=7)
 reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
 chatMatcher = on_command("aqua chat", block=True, priority=7)
+# resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
 
 replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
@@ -173,7 +175,7 @@ async def get_illust_aqua(bot: Bot, event: Event, args: list):
 
     for image in images:
         ret = await get_pixiv_image(image,"http://127.0.0.1:7890")
-        if(ret.status_code == ACTION_SUCCESS):
+        if (ret.status_code == ACTION_SUCCESS):
             await bot.send(event, MessageSegment.image(ret.content))
 
 
@@ -400,8 +402,8 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 async def _(event: MessageEvent, arg: str = Arg("arg")):
     if isinstance(arg, Message):
         arg = event.get_message().extract_plain_text()
-    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust"]:
-        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust']")
+    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust", "chat", "reset_chat"]:
+        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust','chat','reset_chat']")
     await helpMatcher.finish(MessageSegment.text(_text["chinese"][f"help_{arg}"]))
 
 
@@ -542,15 +544,24 @@ async def save_aqua(bot: Bot, event: Event):
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     await save_aqua(get_bot(), event)
 
+# @resetChatMatcher.handle()
+# async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+#     id = event.user_id
+#     bot = get_bot()
+#     try:
+#         del session[id]
+#     except KeyError:
+#         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("无对话缓存, 无需刷新"))
+#         return
+#     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
+
+
 async def chat_aqua(bot: Bot, event: Event, text:str):
-    session_id = event.get_session_id()
-    msg = await chat(**session[session_id]).get_chat_response(text, "http://127.0.0.1:7890")
-    await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(msg))
-    return
+    cd_id = event.user_id
+    resp = await ChatBot.chat(cd_id, text)
+
+    return await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(resp.message))
     
-@scheduler.scheduled_job("interval", minutes=30)
-async def refresh_session() -> None:
-    await chat.refresh_session("http://127.0.0.1:7890")
 
 @chatMatcher.handle()
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
