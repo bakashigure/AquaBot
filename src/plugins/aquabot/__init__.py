@@ -50,7 +50,14 @@ plugin_config = Config(**global_config.dict())
 # logger.warning(global_config.aqua_bot_pic_storage)
 
 
-ChatBot = ChatBot(organization = _config["openai_organization"], api_key=_config["openai_api_key"], max_token=_config["openai_max_token"], enable_cd = True, proxy_url="http://127.0.0.1:7890")
+ChatBot = ChatBot(api_key=_config["openai_api_key"],
+                  max_token=_config["openai_max_token"],
+                  enable_cd = True,
+                  proxy_url = "http://127.0.0.1:7890",
+                  cd = _config["openai_cd"],
+                  block_list = _config["openai_block_list"],
+                  context_support = True
+                  )
 
 logger.add("aqua.log", rotation="00:00") # split by day
 
@@ -86,8 +93,8 @@ statsMatcher = on_command("aqua stats", block=True, priority=7)
 saveMatcher = on_command("aqua save", block=True, priority=7)
 reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
-chatMatcher = on_command("aqua chat", block=True, priority=7)
-# resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
+chatMatcher = on_command("aqua chat", block=True, priority=7, aliases={"ac"})
+resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
 
 replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
@@ -402,8 +409,8 @@ async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg())
 async def _(event: MessageEvent, arg: str = Arg("arg")):
     if isinstance(arg, Message):
         arg = event.get_message().extract_plain_text()
-    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust", "chat", "reset_chat"]:
-        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust','chat','reset_chat']")
+    if arg not in ["random", "more", "help", "pixiv", "upload", "stats", "search", "delete","illust", "chat", "resetchat"]:
+        await helpMatcher.reject("可选项: ['random','more','help','pixiv','upload','stats','search','delete','illust','chat','resetchat']")
     await helpMatcher.finish(MessageSegment.text(_text["chinese"][f"help_{arg}"]))
 
 
@@ -544,16 +551,11 @@ async def save_aqua(bot: Bot, event: Event):
 async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
     await save_aqua(get_bot(), event)
 
-# @resetChatMatcher.handle()
-# async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
-#     id = event.user_id
-#     bot = get_bot()
-#     try:
-#         del session[id]
-#     except KeyError:
-#         await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("无对话缓存, 无需刷新"))
-#         return
-#     await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text("当前会话已刷新"))
+@resetChatMatcher.handle()
+async def _(matcher: Matcher, event: MessageEvent, args: Message = CommandArg()):
+    resp = ChatBot.reset_chat(event.user_id)
+    bot = get_bot()
+    await bot.send(event, MessageSegment.reply(event.message_id) + MessageSegment.text(resp.message))
 
 
 async def chat_aqua(bot: Bot, event: Event, text:str):

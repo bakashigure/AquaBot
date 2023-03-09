@@ -11,6 +11,7 @@ Define some functions for AquaBot
 from io import BytesIO
 from pathlib import Path
 import json
+import traceback
 from typing import Dict, Literal,Union
 import nonebot
 from nonebot.log import logger
@@ -22,6 +23,8 @@ from .config import _config
 import time
 from os.path import getsize
 from .response import *
+import asyncio
+from functools import wraps
 
 logger.warning("importing utils...")
 
@@ -235,3 +238,20 @@ def builtin_cd(data:Dict[int, int], id: int, cd: int) -> bool:
         * ``bool`` : 是否在冷却中
     """
     return id in data and time.time() - data[id] < cd
+
+
+def async_retry(max_retries = 3, delay = 1, final_str = "出现错误, 请稍后再试"):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            for i in range(max_retries + 1):
+                try:
+                    result = await func(*args, **kwargs)
+                    return result
+                except Exception as e:
+                    logger.error(traceback.print_exc())
+                    print(f"Retrying in {delay} seconds... ({i + 1}/{max_retries})")
+                    await asyncio.sleep(delay)
+            return BaseResponse(status_code = ACTION_FAILED, message = final_str)
+        return wrapper
+    return decorator

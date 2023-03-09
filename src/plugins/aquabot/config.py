@@ -114,6 +114,7 @@ if _config['language'] not in ['aqua', 'chinese', 'english', 'japanese']:
 
 
 # openai key
-_config["openai_organization"] = global_config.aqua_bot_openai_organization
 _config["openai_api_key"] = global_config.aqua_bot_openai_api_key
 _config["openai_max_token"] = global_config.aqua_bot_openai_max_token
+_config["openai_block_list"] = global_config.aqua_bot_openai_block_list
+_config["openai_cd"] = global_config.aqua_bot_openai_cd

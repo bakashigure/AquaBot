@@ -65,7 +65,7 @@ aqua illust [pid] (可选尺寸)\n\
 aqua search [图] - 搜图\n\
 aqua stats - 现在有多少张夸图?\n\
 aqua chat [句子] - 与 gpt-3.5-turbo-0301 聊天\n\
-aqua resetchat*功能未开启* - 重置 chatgpt 会话缓存\n\
+aqua resetchat - 重置 gpt-3.5-turbo-0301 会话缓存\n\
 ————————\n\
 提供`keyword`以查看命令详细帮助
 """
@@ -139,12 +139,15 @@ text['chinese']['help_stats'] = f'''aqua stats\n\
 text["chinese"][
     "help_chat"
 ] = f"""aqua chat [语句]\n\
-与 gpt-3.5-turbo-0301 对话, 不支持上下文, 单次对话token限制400, 对话频率限制10s\n\
+与 gpt-3.5-turbo-0301 对话 \n\
+支持上下文, 对话token限制4095, 对话频率限制10s\n\
+你可以加bot好友后私聊使用, 避免群内刷屏\n\
+请不要摄正, 会被ban\n\
 """
 
 text["chinese"][
     "help_resetchat"
 ] = f"""aqua resetchat\n\
-重置与 chatgpt 的会话缓存\n\
+重置与 gpt-3.5-turbo-0301 的会话缓存\n\
 """
 
