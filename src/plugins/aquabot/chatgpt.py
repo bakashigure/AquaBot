@@ -20,7 +20,8 @@ class ChatBot:
         cd: int = 10,
         proxy_url = None,
         block_list : List[int] = [],
-        context_support : bool = False
+        context_support : bool = False,
+        pro_users: List[int] = []
     ):
         self._api_key = api_key
         self._enable_cd = enable_cd
@@ -30,6 +31,7 @@ class ChatBot:
         self._cd = cd
         self._context_support = context_support
         self._contexts = {}
+        self._pro_users = pro_users
             
         openai.api_key = self._api_key
         if proxy_url:
@@ -47,8 +49,9 @@ class ChatBot:
         if id in self._block_list:
             return Response(status_code=ACTION_SUCCESS, message="aqua chat: ban!")
         
-        if self._enable_cd and self._cd_function(self._cd_data, id, self._cd):
-            return Response(status_code = ACTION_FAILED, message = f"aqua chat: 冷却中, 当前冷却时间为 {self._cd} 秒 ")
+        if id not in self._pro_users:
+            if self._enable_cd and self._cd_function(self._cd_data, id, self._cd):
+                return Response(status_code = ACTION_FAILED, message = f"aqua chat: 冷却中, 当前冷却时间为 {self._cd} 秒 ")
 
         rep = await openai.ChatCompletion.acreate(
             model = self._model_name,

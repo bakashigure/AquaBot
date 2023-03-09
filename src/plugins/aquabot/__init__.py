@@ -56,7 +56,8 @@ ChatBot = ChatBot(api_key=_config["openai_api_key"],
                   proxy_url = "http://127.0.0.1:7890",
                   cd = _config["openai_cd"],
                   block_list = _config["openai_block_list"],
-                  context_support = True
+                  context_support = True,
+                  pro_users = _config["openai_pro_users"],
                   )
 
 logger.add("aqua.log", rotation="00:00") # split by day
