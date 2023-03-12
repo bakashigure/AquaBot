@@ -17,6 +17,7 @@ class Api():
         self.__api = pixivpy.AppPixivAPI(**REQUEST_KWARGS) # app api
         self.__api.set_accept_language('zh-cn')
         self.refresh_token = refresh_token
+        self.last_refresh_time = 0
 
     def get_api(self):
         if not self.last_refresh_time or time.time() - self.last_refresh_time > 3600:

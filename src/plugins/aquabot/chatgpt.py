@@ -4,10 +4,12 @@ import time
 from .utils import Singleton, builtin_cd, async_retry
 from .response import *
 from loguru import logger
+import tiktoken
+
+MAX_TOKEN = 4095 # 4096 is the max token for gpt-3
 
 
 Response = BaseResponse
-
 
 @Singleton
 class ChatBot:
@@ -81,7 +83,22 @@ class ChatBot:
                 return self._contexts[id]
             else:
                 self._contexts[id].append({"role": "user", "content": message})
-                return self._contexts[id]
+                messages = self._contexts[id]
+                while(self.num_tokens_from_messages(messages) > MAX_TOKEN):
+                    logger.info(f"message too long, pop first message: {messages[0]}")
+                    messages.pop(0)
+                return messages
         else:
             return [{"role": "user", "content": message}]
         
+    def num_tokens_from_messages(self, messages: List[dict]) -> int:
+        encoding = tiktoken.encoding_for_model(self._model_name)
+        num_tokens = 0
+        for message in messages:
+            num_tokens += 4
+            for k,v in message.items():
+                num_tokens += len(encoding.encode(v))
+                if k == "name":
+                    num_tokens += -1
+        num_tokens += 2
+        return num_tokens
