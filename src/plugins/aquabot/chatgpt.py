@@ -6,8 +6,7 @@ from .response import *
 from loguru import logger
 import tiktoken
 
-MAX_TOKEN = 4095 # 4096 is the max token for gpt-3
-
+MAX_TOKENS = 4095 # 总对话token限制, chat token需要总-compeletion token
 
 Response = BaseResponse
 
@@ -34,7 +33,9 @@ class ChatBot:
         self._context_support = context_support
         self._contexts = {}
         self._pro_users = pro_users
-            
+        
+        self._max_messages_token = MAX_TOKENS - self._max_token
+        
         openai.api_key = self._api_key
         if proxy_url:
             openai.proxy = {
@@ -84,7 +85,7 @@ class ChatBot:
             else:
                 self._contexts[id].append({"role": "user", "content": message})
                 messages = self._contexts[id]
-                while(self.num_tokens_from_messages(messages) > MAX_TOKEN):
+                while(self.num_tokens_from_messages(messages) > self._max_messages_token):
                     logger.info(f"message too long, pop first message: {messages[0]}")
                     messages.pop(0)
                 return messages
