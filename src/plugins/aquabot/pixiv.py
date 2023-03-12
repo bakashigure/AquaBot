@@ -145,7 +145,7 @@ async def get_pixiv_image_by_pid(pid,refresh_token,_REQUESTS_KWARGS=None,proxies
     * ``Response.status_code: int``: 状态码
     * ``Response.content: (dict,Image.Image)``: 图片信息和图片对象
     """
-    api = Api(refresh_token,**_REQUESTS_KWARGS).api
+    api = Api(refresh_token,**_REQUESTS_KWARGS).get_api()
     illust_info = api.illust_detail(pid)
     #print(illust_info)
     #print(type(illust_info))
