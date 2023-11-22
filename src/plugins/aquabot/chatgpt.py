@@ -27,7 +27,7 @@ class ChatBot:
         self._api_key = api_key
         self._enable_cd = enable_cd
         self._max_token = max_token
-        self._model_name = "gpt-3.5-turbo-0301"
+        self._model_name = "gpt-3.5-turbo"
         self._block_list = block_list
         self._cd = cd
         self._context_support = context_support
