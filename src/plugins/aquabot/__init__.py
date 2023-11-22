@@ -38,6 +38,7 @@ from .utils import ACTION_FAILED, ACTION_SUCCESS, ACTION_WARNING, get_message_im
 from .utils import record_id as _record_id
 from .utils import upload_to_local
 from .chatgpt import ChatBot
+from .cat import cat_detect
 
 logger.warning("importing AquaBot..")
 
@@ -96,6 +97,7 @@ reloadMatcher = on_command("aqua reload", block=True, priority=7)
 getIllustMatcher = on_command("aqua illust", block=True, priority=7)
 chatMatcher = on_command("aqua chat", block=True, priority=7, aliases={"ac"})
 resetChatMatcher = on_command("aqua resetchat", block=True, priority=7)
+catMatcher = on_message(priority=8, block=False)
 
 replySearchMatcher = on_message(priority=8, block=True)
 pokeMatcher = on_notice()  # 戳一戳
@@ -501,6 +503,18 @@ async def more_aqua(bot: Bot, event: Event):
 async def reload_aqua():
     return db.reload()
 
+
+@catMatcher.handle()
+async def _(bot: Bot, event: MessageEvent):
+    if event.message_type=="group":
+        if event.group_id in _config["cat_detect_group"]:
+            images = await get_message_image(data=event.json(), type="file")
+            if images:
+                for image in images:
+                    res = await cat_detect(_config["cat_detect_group"], image, "http://127.0.0.1:7890")
+                    print(res)
+                    if res.status_code == ACTION_SUCCESS:
+                        await bot.send(event, MessageSegment.image(res.content))
 
 @reloadMatcher.handle()
 async def _():
