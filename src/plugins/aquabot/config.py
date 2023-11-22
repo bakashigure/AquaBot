@@ -119,3 +119,6 @@ _config["openai_max_token"] = global_config.aqua_bot_openai_max_token
 _config["openai_block_list"] = global_config.aqua_bot_openai_block_list
 _config["openai_cd"] = global_config.aqua_bot_openai_cd
 _config["openai_pro_users"] = global_config.aqua_bot_openai_pro_users
+
+_config["cat_detect_url"] = global_config.aqua_bot_cat_detect_url
+_config["cat_detect_group"] = global_config.aqua_bot_cat_detect_group
