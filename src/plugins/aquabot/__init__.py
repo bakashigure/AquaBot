@@ -511,7 +511,7 @@ async def _(bot: Bot, event: MessageEvent):
             images = await get_message_image(data=event.json(), type="file")
             if images:
                 for image in images:
-                    res = await cat_detect(_config["cat_detect_group"], image, "http://127.0.0.1:7890")
+                    res = await cat_detect(_config["cat_detect_url"], image, "http://127.0.0.1:7890")
                     print(res)
                     if res.status_code == ACTION_SUCCESS:
                         await bot.send(event, MessageSegment.image(res.content))
