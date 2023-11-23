@@ -122,3 +122,4 @@ _config["openai_pro_users"] = global_config.aqua_bot_openai_pro_users
 
 _config["cat_detect_url"] = global_config.aqua_bot_cat_detect_url
 _config["cat_detect_group"] = global_config.aqua_bot_cat_detect_group
+_config["cat_detect_private"] = global_config.aqua_bot_cat_detect_private

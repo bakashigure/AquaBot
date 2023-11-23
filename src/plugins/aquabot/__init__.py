@@ -506,15 +506,20 @@ async def reload_aqua():
 
 @catMatcher.handle()
 async def _(bot: Bot, event: MessageEvent):
-    if event.message_type=="group":
-        if event.group_id in _config["cat_detect_group"]:
-            images = await get_message_image(data=event.json(), type="file")
-            if images:
-                for image in images:
-                    res = await cat_detect(_config["cat_detect_url"], image, "http://127.0.0.1:7890")
-                    print(res)
-                    if res.status_code == ACTION_SUCCESS:
-                        await bot.send(event, MessageSegment.image(res.content))
+    if event.message_type =="group":
+        if event.group_id not in _config["cat_detect_group"]:
+            return
+    else:
+        if event.user_id not in _config["cat_detect_private"]:
+            return
+
+    images = await get_message_image(data=event.json(), type="file")
+    if images:
+        for image in images:
+            res = await cat_detect(_config["cat_detect_url"], image, "http://127.0.0.1:7890")
+            if res.status_code == ACTION_SUCCESS:
+                await bot.send(event, MessageSegment.image(res.content))
+            
 
 @reloadMatcher.handle()
 async def _():
